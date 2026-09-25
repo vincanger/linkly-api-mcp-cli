@@ -1,6 +1,7 @@
 import { api, page, query, route, type Spec } from "@wasp.sh/spec";
 import { getLinkStats, getTopLinks } from "./operations" with { type: "ref" };
 import { redirect } from "./redirect" with { type: "ref" };
+import { restLinkStats, restTopLinks } from "./rest" with { type: "ref" };
 import { TopLinksPage } from "./ui/TopLinksPage" with { type: "ref" };
 
 export const analyticsSpec: Spec = [
@@ -10,4 +11,7 @@ export const analyticsSpec: Spec = [
   route("TopLinksRoute", "/analytics", page(TopLinksPage, { authRequired: true })),
   query(getLinkStats, { entities: ["Link", "Click"] }),
   query(getTopLinks, { entities: ["Link", "Click"] }),
+  // REST API
+  api("GET", "/api/v1/links/:id/stats", restLinkStats, { auth: false }),
+  api("GET", "/api/v1/analytics/top-links", restTopLinks, { auth: false }),
 ];

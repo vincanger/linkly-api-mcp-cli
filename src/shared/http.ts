@@ -87,3 +87,23 @@ export function publicHandler(
     }
   };
 }
+
+type Handler = (req: Request, res: Response) => Promise<void> | void;
+
+/**
+ * Dispatches one path to per-method handlers. Wasp's `api()` has no PATCH,
+ * so routes that need it are declared with "ALL" and routed here; any other
+ * method gets 405 with an Allow header.
+ */
+export function byMethod(handlers: Partial<Record<"GET" | "POST" | "PATCH" | "PUT" | "DELETE", Handler>>): Handler {
+  const allowed = Object.keys(handlers).join(", ");
+  return async (req, res) => {
+    const handler = handlers[req.method.toUpperCase() as keyof typeof handlers];
+    if (!handler) {
+      res.setHeader("Allow", allowed);
+      res.status(405).json({ error: { code: "method_not_allowed", message: `Use one of: ${allowed}.` } });
+      return;
+    }
+    await handler(req, res);
+  };
+}

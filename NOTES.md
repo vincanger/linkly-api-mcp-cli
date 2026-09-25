@@ -81,3 +81,22 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 **Deviations**
 - The top-links view lives at `/analytics` (the spec names the builder `topLinks` but no path).
 - E2E helpers: `logIn` waits for the post-login redirect, and `gotoReady` waits for network idle before filling forms, because an auth refetch right after navigation can re-render the page and wipe typed values.
+
+## M3: REST API, PATs, and OpenAPI
+
+**Built**
+- `src/tokens/`: personal access tokens (`lk_pat_…`, SHA-256 stored, raw value shown once), session-only create/list/revoke, and `/settings/tokens` (name, permission checkboxes, expiry, a dialog that shows the new token once, revoke with confirmation, link to `openapi.json`).
+- `src/shared/bearer.ts`: bearer authentication. PATs work on `/api/v1` and `/mcp`; OAuth tokens must match the resource's audience and take their scopes and `confirmDestructive` from the grant at request time; revoked or expired tokens are rejected; `lastUsedAt` is updated at most once a minute, fire-and-forget.
+- REST handlers in each slice's `rest.ts`: `GET/POST /api/v1/links`, `GET/PATCH/DELETE /api/v1/links/:id`, `GET /api/v1/links/:id/stats`, `GET /api/v1/analytics/top-links`, and `GET /api/v1/me` (new `src/account/` slice, same shape as the `whoami` tool). All REST `api`s use `auth: false` so Wasp doesn't try to read our bearer tokens as session tokens.
+- OpenAPI 3.1: each slice's `openapi.ts` registers its paths from its Zod schemas; `src/openapi/document.ts` assembles them with `bearer` and `oauth2` (authorization code + PKCE) security schemes and per-operation scopes; served publicly at `GET /api/v1/openapi.json`. Every operation has `x-destructive` (only `DELETE /links/{id}` is `true`).
+- 401s on `/api/v1` already carry `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource/api/v1"`.
+
+**Tests**
+- `src/tokens/service.test.ts`: hash-only storage, PATs can't mint PATs, PAT works on both resources until revoked, expiry, cross-user revoke, malformed headers, OAuth audience check, grant scopes winning over token scopes, revoked grant, `lastUsedAt` throttling.
+- `src/openapi/document.test.ts`: validates with `@apidevtools/swagger-parser`, checks `x-destructive` on every operation, and security schemes/scopes.
+- `e2e/rest.spec.ts`: a token created on the tokens page does full CRUD, stats, and top links over HTTP; 409/400/405/404 cases; revoking on the page makes it 401; a read-only token gets 403 naming the missing scope; no token gets 401 with `WWW-Authenticate`; the served `openapi.json` is public (CORS `*`) and valid.
+
+**Deviations**
+- Wasp's `api()` supports only `GET`, `POST`, `PUT`, `DELETE`, and `ALL`. `PATCH /api/v1/links/:id` is served by an `ALL` route that dispatches by method (`byMethod` in `src/shared/http.ts`) and returns 405 with an `Allow` header for anything else. `/api/v1/links` uses the same helper.
+- The docs REST endpoints move to M6 with the rest of the docs slice (the spec lists them in both M3 and M6).
+- `vite.config.ts` pre-bundles dependencies that are only discovered on some pages, and the Playwright global setup loads the app once before tests. Without this, Vite's first-visit dependency optimization reloads the page mid-test.

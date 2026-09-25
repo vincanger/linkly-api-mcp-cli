@@ -7,4 +7,21 @@ export default defineConfig({
   server: {
     open: false,
   },
+  // Pre-bundle dependencies that are only discovered on some pages, so Vite
+  // doesn't reload the page the first time one of those pages is visited.
+  optimizeDeps: {
+    include: [
+      "@hookform/resolvers/zod",
+      "react-hook-form",
+      "recharts",
+      "radix-ui",
+      "lucide-react",
+      "sonner",
+      "next-themes",
+      "zod",
+      "@asteasolutions/zod-to-openapi",
+      "class-variance-authority",
+      "cn",
+    ],
+  },
 });
