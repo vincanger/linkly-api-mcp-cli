@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { SERVER_URL } from "./env";
 import { apiClient } from "./fixtures/api";
-import { authorizeUrl, consent, pkcePair, startTestClient, tokenRequest, type TestClient } from "./fixtures/testClient";
-import { createVerifiedUser, type TestUser } from "./fixtures/users";
+import { db } from "./fixtures/db";
+import { connectMcp, textOf } from "./fixtures/mcp";
+import { authorizeUrl, consent, oauthTokens, pkcePair, startTestClient, tokenRequest, type TestClient } from "./fixtures/testClient";
+import { createVerifiedUser, gotoReady, logIn, type TestUser } from "./fixtures/users";
 
 let client: TestClient;
 let user: TestUser;
@@ -172,5 +174,77 @@ test.describe("M5: MCP client over OAuth", () => {
     // The MCP token is bound to /mcp: the REST API rejects it.
     const accessToken = (tokens as { access_token: string }).access_token;
     expect((await apiClient(accessToken)("GET", "/me")).status).toBe(401);
+  });
+});
+
+test.describe("M7: deletions that need confirmation", () => {
+  test("delete_link returns a confirm URL; confirming in the browser deletes the link", async ({ page }) => {
+    const tokens = await oauthTokens(page, client, user); // "Require confirmation" is on by default
+    const mcp = await connectMcp(tokens.access_token);
+    try {
+      const created = await mcp.call("create_link", { destinationUrl: "https://example.com/confirm-me" });
+      const { id, slug } = created.structuredContent as { id: string; slug: string };
+
+      const res = await mcp.call("delete_link", { id });
+      const { status, confirmUrl } = res.structuredContent as { status: string; confirmUrl: string };
+      expect(status).toBe("confirmation_required");
+      expect((await mcp.call("get_link", { id })).isError).toBeFalsy(); // not deleted yet
+
+      await gotoReady(page, new URL(confirmUrl).pathname);
+      await expect(page.getByText(`/r/${slug}`)).toBeVisible();
+      await expect(page.getByTestId("requested-by")).toHaveText("Test Client");
+      await page.getByRole("button", { name: "Confirm delete" }).click();
+      await expect(page.getByTestId("action-completed")).toBeVisible();
+
+      const gone = await mcp.call("get_link", { id });
+      expect(gone.isError).toBe(true);
+      expect(textOf(gone)).toMatch(/^not_found/);
+
+      // Confirming twice fails gracefully: the page shows it's already done.
+      await gotoReady(page, new URL(confirmUrl).pathname);
+      await expect(page.getByTestId("action-completed")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Confirm delete" })).toHaveCount(0);
+    } finally {
+      await mcp.close();
+    }
+  });
+
+  test("a different user or an expired request can't confirm", async ({ page, browser }) => {
+    const tokens = await oauthTokens(page, client, user);
+    const mcp = await connectMcp(tokens.access_token);
+    try {
+      const a = (await mcp.call("create_link", { destinationUrl: "https://example.com/a" })).structuredContent as { id: string };
+      const b = (await mcp.call("create_link", { destinationUrl: "https://example.com/b" })).structuredContent as { id: string };
+      const urlA = ((await mcp.call("delete_link", { id: a.id })).structuredContent as { confirmUrl: string }).confirmUrl;
+      const urlB = ((await mcp.call("delete_link", { id: b.id })).structuredContent as { confirmUrl: string }).confirmUrl;
+
+      // Another user, in a separate browser session.
+      const stranger = await createVerifiedUser();
+      const other = await browser.newPage();
+      await logIn(other, stranger);
+      await gotoReady(other, new URL(urlA).pathname);
+      await expect(other.getByText("Confirmation not found")).toBeVisible();
+      await other.close();
+      expect((await mcp.call("get_link", { id: a.id })).isError).toBeFalsy();
+
+      // Expired: move the expiry into the past.
+      await db.pendingAction.update({ where: { id: new URL(urlB).pathname.split("/").pop()! }, data: { expiresAt: new Date(Date.now() - 1000) } });
+      await gotoReady(page, new URL(urlB).pathname);
+      await expect(page.getByTestId("action-expired")).toBeVisible();
+      expect((await mcp.call("get_link", { id: b.id })).isError).toBeFalsy();
+    } finally {
+      await mcp.close();
+    }
+  });
+
+  test("with confirmation off, deletion is immediate", async ({ page }) => {
+    const tokens = await oauthTokens(page, client, user, { confirmDestructive: false });
+    const mcp = await connectMcp(tokens.access_token);
+    try {
+      const { id } = (await mcp.call("create_link", { destinationUrl: "https://example.com/now" })).structuredContent as { id: string };
+      expect((await mcp.call("delete_link", { id })).structuredContent).toMatchObject({ status: "deleted", id });
+    } finally {
+      await mcp.close();
+    }
   });
 });

@@ -98,3 +98,24 @@ export async function tokenRequest(body: Record<string, string>) {
   });
   return { status: res.status, body: (await res.json()) as Record<string, string> };
 }
+
+/** Full browser OAuth flow for a test client: consent, then exchange the code. */
+export async function oauthTokens(
+  page: Page,
+  client: TestClient,
+  user: TestUser,
+  opts: { resource?: string; uncheck?: string[]; confirmDestructive?: boolean } = {},
+): Promise<{ access_token: string; refresh_token: string; scope: string }> {
+  const { verifier, challenge } = pkcePair();
+  const extra = opts.resource ? { resource: opts.resource } : undefined;
+  await consent(page, user, authorizeUrl(client, challenge, extra), opts);
+  const res = await tokenRequest({
+    grant_type: "authorization_code",
+    code: client.lastCallback()!.code!,
+    code_verifier: verifier,
+    client_id: client.clientId,
+    redirect_uri: client.redirectUri,
+  });
+  if (res.status !== 200) throw new Error(`token exchange failed: ${JSON.stringify(res.body)}`);
+  return res.body as { access_token: string; refresh_token: string; scope: string };
+}

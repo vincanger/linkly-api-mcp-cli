@@ -28,6 +28,10 @@ export const OPERATION_COVERAGE: Record<string, string> = {
   getGrants: "dashboard-only: an app can't inspect or change its own permissions (whoami shows them)",
   updateGrant: "dashboard-only: an app can't inspect or change its own permissions (whoami shows them)",
   revokeGrant: "dashboard-only: an app can't inspect or change its own permissions (whoami shows them)",
+  // deeplinks: confirming a destructive action is the human's job
+  getPendingAction: "dashboard-only: the confirm page is where the human approves what an app asked for",
+  confirmPendingAction: "dashboard-only: the confirm page is where the human approves what an app asked for",
+  cancelPendingAction: "dashboard-only: the confirm page is where the human approves what an app asked for",
 };
 
 /** Tools with no dashboard operation, and why. */
@@ -35,6 +39,7 @@ export const MCP_ONLY_TOOLS: Record<string, string> = {
   whoami: "agents need to self-orient; the dashboard shows the logged-in user in the header",
   search_docs: "the dashboard's docs pages read the same content directly (no operation needed)",
   read_doc: "the dashboard's docs pages read the same content directly (no operation needed)",
+  get_dashboard_url: "it points agents at the dashboard itself",
 };
 
 function waspOperationNames(): string[] {

@@ -107,6 +107,16 @@ describe("MCP server", () => {
     expect(read.contents[0]).toMatchObject({ mimeType: "text/markdown", text: expect.stringContaining("# Tags") });
   });
 
+  it("builds dashboard URLs for agents", async () => {
+    const { call } = await connect(pat([]));
+    const stats = await call("get_dashboard_url", { view: "link", id: "promo", params: { range: "30d" } });
+    expect(stats.structuredContent).toEqual({ view: "link", url: "http://localhost:3000/links/promo?tab=stats&range=30d" });
+    const form = await call("get_dashboard_url", { view: "newLink", params: { destinationUrl: "https://a.com", tags: ["x"] } });
+    expect((form.structuredContent as { url: string }).url).toBe("http://localhost:3000/links/new?destinationUrl=https%3A%2F%2Fa.com&tags=x");
+    const missingId = await call("get_dashboard_url", { view: "link" });
+    expect(missingId.isError).toBe(true);
+  });
+
   it("only lists tools the principal's scopes allow, and ?toolsets= only narrows", async () => {
     const names = async (p: Principal, t?: ("links" | "analytics")[]) => {
       const c = await connectInProcess(p, t);
@@ -115,10 +125,10 @@ describe("MCP server", () => {
       return tools.map((x) => x.name).sort();
     };
     const analyticsOnly = pat(["analytics:read"]);
-    expect(await names(analyticsOnly)).toEqual(["get_link_stats", "get_top_links", "read_doc", "search_docs", "whoami"]);
-    expect(await names(analyticsOnly, ["links"])).toEqual(["read_doc", "search_docs", "whoami"]); // can't widen
-    expect(await names(pat(), ["analytics"])).toEqual(["get_link_stats", "get_top_links", "read_doc", "search_docs", "whoami"]);
+    expect(await names(analyticsOnly)).toEqual(["get_dashboard_url", "get_link_stats", "get_top_links", "read_doc", "search_docs", "whoami"]);
+    expect(await names(analyticsOnly, ["links"])).toEqual(["get_dashboard_url", "read_doc", "search_docs", "whoami"]); // can't widen
+    expect(await names(pat(), ["analytics"])).toEqual(["get_dashboard_url", "get_link_stats", "get_top_links", "read_doc", "search_docs", "whoami"]);
     const readOnly = pat(["links:read"]);
-    expect(await names(readOnly)).toEqual(["get_link", "list_links", "read_doc", "search_docs", "whoami"]);
+    expect(await names(readOnly)).toEqual(["get_dashboard_url", "get_link", "list_links", "read_doc", "search_docs", "whoami"]);
   });
 });

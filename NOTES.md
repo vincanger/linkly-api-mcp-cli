@@ -8,6 +8,7 @@ These can't be automated. The Playwright end-to-end tests cover the same flows h
 
 - **MCP Inspector OAuth flow (M4).** Run the app (`wasp start db`, `wasp start`), then `npx @modelcontextprotocol/inspector`. Choose "Streamable HTTP", URL `http://localhost:3001/mcp`, and click Connect. Expected: the Inspector discovers the auth server from the 401, opens `http://localhost:3000/oauth/authorize`, you log in and click Allow, and the Inspector lists Linkly's tools. (The Inspector must publish a CIMD `client_id`; if the installed version only supports Dynamic Client Registration, this check waits for optional milestone M11.)
 
+- **The confirm page on a phone (M7).** Open a `/confirm/<actionId>` link (make one with an OAuth connection that requires confirmation, then call `delete_link`) on a phone or in the browser's device emulation at ~375px wide. Expected: the details, the expiry time, and the Cancel / Confirm delete buttons are readable and tappable without horizontal scrolling.
 - **A real third-party MCP client end-to-end (M5).** Needs a public HTTPS URL for Linkly (for example a tunnel such as `cloudflared tunnel --url http://localhost:3001`, with `WASP_SERVER_URL`/`WASP_WEB_CLIENT_URL` set to the public URLs) and a real account in the client. In Claude: Settings → Connectors → Add custom connector → `<public server URL>/mcp`. Expected: Claude opens the Linkly consent page, you click Allow, and asking "list my Linkly links" and "create a short link to https://example.com" works. Then check the grant appears on `/settings/connections`.
 
 ## Decisions made without the author
@@ -167,3 +168,17 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 
 **Deviations**
 - The dashboard's docs pages import the docs content directly instead of going through Wasp operations (the content is public and bundled), so there are no docs operations; the parity map lists `search_docs` and `read_doc` as covered by those pages.
+
+## M7: Deep links and confirmations
+
+**Built**
+- `get_dashboard_url` (core tool): `view` is one of `links`, `link`, `newLink`, `topLinks`, `connections`, `tokens`, `doc` (not `confirm`), with an optional `id` and view-specific `params`. It uses the same `dashboardUrls` builders as every `dashboardUrl` in tool, REST, and CLI output (links, stats, top links, whoami, docs).
+- Every page honors its builder's parameters: `/links?search=&tag=`, `/links/:id?tab=&range=&groupBy=`, `/links/new?destinationUrl=&slug=&title=&tags=`, `/analytics?range=`, `/docs/:slug`, `/confirm/:actionId`.
+- `/confirm/:actionId` (`ConfirmActionPage`): shows the link's slug and destination and the requesting app, with Cancel and Confirm delete. Handles completed, cancelled, expired, and other-user ("not found") states. Logged-out visitors go through login and come back.
+- Operations `getPendingAction`, `confirmPendingAction`, `cancelPendingAction` (session only). Confirming claims the action atomically before deleting, so a double submit can't run twice.
+
+**Tests**
+- `src/deeplinks/urls.test.ts`: every builder's route exists in the `*.wasp.ts` files, and every builder's output matches its route pattern and query parameters.
+- `src/deeplinks/pendingActions.test.ts`: same-user confirm deletes; other user → not found; expired → conflict; twice → conflict; cancel; tokens can't confirm; no-confirmation grants delete immediately.
+- `src/mcp/server.test.ts`: `get_dashboard_url` URLs and the missing-id error.
+- `e2e/oauth.spec.ts` M7 steps: with a real OAuth token (confirmation on by default), `delete_link` returns a confirm URL, the link survives until the user clicks Confirm delete in the browser, then it's gone, and revisiting shows it's already done; a second user sees "not found"; an expired request shows "expired"; with confirmation off, deletion is immediate.

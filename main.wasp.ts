@@ -12,6 +12,7 @@ import { openapiSpec } from "./src/openapi/openapi.wasp";
 import { oauthSpec } from "./src/oauth/oauth.wasp";
 import { mcpSpec } from "./src/mcp/mcp.wasp";
 import { docsSpec } from "./src/docs/docs.wasp";
+import { deeplinksSpec } from "./src/deeplinks/deeplinks.wasp";
 
 // The Wasp Spec only joins the slices. Each slice declares its own pages,
 // routes, operations, and APIs in its `<slice>.wasp.ts` file.
@@ -49,6 +50,7 @@ export default app({
     oauthSpec,
     mcpSpec,
     docsSpec,
+    deeplinksSpec,
     testingSpec,
   ],
 });
