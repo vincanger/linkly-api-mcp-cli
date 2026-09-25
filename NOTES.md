@@ -15,6 +15,10 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - **URLs come from env, set by Wasp at startup.** `src/shared/urls.ts` reads `WASP_SERVER_URL` / `WASP_WEB_CLIENT_URL` (Wasp's own env vars, with Wasp's dev defaults) and the server `setupFn` re-applies Wasp's validated `env` values. This keeps `urls.ts` free of `wasp/*` imports so unit tests can use it. The spec said "use Wasp's server `config`"; the values are the same.
 - **`toWaspHttpError` lives in `src/shared/waspErrors.ts`**, not `errors.ts`, because it needs `HttpError` from `wasp/server` and `errors.ts` must stay framework-free for unit tests.
 - **Bearer auth is a handler wrapper (`withBearer`), not namespace middleware.** Some `/api/v1` routes are public (docs, `openapi.json`), so auth is applied per handler. The logic lives in `src/shared/bearer.ts` (framework-free) and `withBearer` adds the `WWW-Authenticate` header on 401.
+- **Test-only fixture API.** `POST /__test/users` (in `src/testing/`) creates an already-verified user with Wasp's `createUser` + `sanitizeAndSerializeProviderData`, because passwords must be hashed the way Wasp does it and tests run in a separate process. It returns 404 unless `LINKLY_ENABLE_TEST_API=true` and `NODE_ENV` isn't `production`. Only `playwright.config.ts` sets that variable.
+- **Every link lookup accepts an ID or a slug** (get, update, delete, stats), not only `getLink`: agents often only know the slug.
+- **Service outputs use ISO strings for dates**, so the same object is valid JSON for REST, MCP `structuredContent`, and the CLI.
+- **Random slugs** use a 32-character alphabet without look-alike characters (no `l`, `o`, `0`, `1`).
 - **Extra columns:** `AuthorizationCode.grantId` (so reusing a code can revoke the grant it created) and `AuthorizationCode.createdAt`, plus an index on `Grant(userId, clientId)`.
 
 ## Environment notes
@@ -43,3 +47,21 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 **Deviations**
 - shadcn's current `init` writes `src/lib/utils.ts` as `export { cn } from "cn"` (the new `cn` package) instead of the older `clsx` + `tailwind-merge` helper. Components import `cn` from `"cn"` directly, so they needed no alias fixes.
 - `onAuthSucceededRedirectTo` is `/` until the `/links` page exists (M1).
+
+## M1: Links slice (dashboard only)
+
+**Built**
+- `src/links/`: Zod schemas (`LinkInput`, `LinkUpdate`, `LinkListQuery`, `LinkOut`, `LinkPage`, `DeleteResult`, all with `.describe()` on every field), `service.ts` (list with search/tag/archived filters and cursor pagination, get by ID or slug, create with random or custom slug, update, delete), Wasp operations, and `links.wasp.ts`.
+- `src/deeplinks/urls.ts` (pure builders) is in place early so every `LinkOut` carries `dashboardUrl` from the start.
+- `src/shared/validate.ts`: `parseInput()` turns Zod failures into `DomainError("invalid")` inside services.
+- UI: `/links` (table, search, tag filter, archived toggle, pagination, row actions, delete dialog), `/links/new` (form prefilled from query params), `/links/:id` (edit/stats tabs driven by `?tab=`, delete). Forms use react-hook-form with the slice's field schemas.
+- Test fixtures: `e2e/fixtures/users.ts` creates verified users through the test-only API and logs in through the real login page.
+
+**Tests**
+- `src/links/service.test.ts`: ownership (another user can't read, update, or delete; reported as not found), slug conflict (including across users), ID-or-slug lookup, validation, tag normalization, scope check, pagination, filters, bad cursor.
+- `e2e/links.spec.ts`: create (from a prefilled deep link), inline validation error, update, list/search/tag filter, server-side slug conflict, delete through the dialog, and another user's link showing "not found".
+
+**Deviations**
+- The spec lists shadcn's `form` component. The current shadcn registry for this style no longer has `form`; it ships `field` instead (used with react-hook-form's `Controller`). Linkly uses `field`.
+- shadcn now also generates `import ... from "src/components/ui/..."` paths. These were rewritten to relative imports like the `@/` ones. Check with `grep -rn 'from "src/\|"@/' src/`.
+- `src/shared/urls.ts` guards `process.env`, because the browser bundle imports the deep-link builders (it only uses their relative paths).

@@ -3,9 +3,13 @@
 // `config` values; the env-var defaults keep framework-free code and tests
 // working without Wasp.
 
+// `process` doesn't exist in the browser bundle (the dashboard imports the
+// deep-link builders but only uses their relative paths).
+const env: Record<string, string | undefined> = typeof process !== "undefined" ? process.env : {};
+
 let bases = {
-  serverUrl: stripSlash(process.env.WASP_SERVER_URL ?? "http://localhost:3001"),
-  frontendUrl: stripSlash(process.env.WASP_WEB_CLIENT_URL ?? "http://localhost:3000"),
+  serverUrl: stripSlash(env.WASP_SERVER_URL ?? "http://localhost:3001"),
+  frontendUrl: stripSlash(env.WASP_WEB_CLIENT_URL ?? "http://localhost:3000"),
 };
 
 export function configureUrls(next: { serverUrl: string; frontendUrl: string }): void {

@@ -3,6 +3,8 @@ import { Layout } from "./src/app/Layout" with { type: "ref" };
 import { mcpMiddleware, oauthMiddleware, restMiddleware, wellKnownMiddleware } from "./src/shared/http" with { type: "ref" };
 import { serverSetup } from "./src/shared/serverSetup" with { type: "ref" };
 import { appSpec } from "./src/app/app.wasp";
+import { linksSpec } from "./src/links/links.wasp";
+import { testingSpec } from "./src/testing/testing.wasp";
 
 // The Wasp Spec only joins the slices. Each slice declares its own pages,
 // routes, operations, and APIs in its `<slice>.wasp.ts` file.
@@ -21,7 +23,7 @@ export default app({
       },
     },
     onAuthFailedRedirectTo: "/login",
-    onAuthSucceededRedirectTo: "/",
+    onAuthSucceededRedirectTo: "/links",
   },
   emailSender: { provider: "Dummy" },
   client: { rootComponent: Layout },
@@ -32,5 +34,7 @@ export default app({
     apiNamespace("/oauth", { middlewareConfigFn: oauthMiddleware }),
     apiNamespace("/.well-known", { middlewareConfigFn: wellKnownMiddleware }),
     appSpec,
+    linksSpec,
+    testingSpec,
   ],
 });
