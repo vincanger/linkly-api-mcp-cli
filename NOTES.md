@@ -65,3 +65,19 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - The spec lists shadcn's `form` component. The current shadcn registry for this style no longer has `form`; it ships `field` instead (used with react-hook-form's `Controller`). Linkly uses `field`.
 - shadcn now also generates `import ... from "src/components/ui/..."` paths. These were rewritten to relative imports like the `@/` ones. Check with `grep -rn 'from "src/\|"@/' src/`.
 - `src/shared/urls.ts` guards `process.env`, because the browser bundle imports the deep-link builders (it only uses their relative paths).
+
+## M2: Redirect and analytics
+
+**Built**
+- `GET /r/:slug` (`src/analytics/redirect.ts`, public Wasp `api`): active links 302 to the destination; missing or archived links get a small 404 page. The click (referrer hostname only, user agent truncated to 200 chars) is recorded without awaiting it on the response path.
+- `src/analytics/service.ts`: `getLinkStats` (by day, zero-filled, or by referrer with `direct` for none) and `getTopLinks`. Day grouping uses `date_trunc('day', ... AT TIME ZONE 'UTC')`. Multi-day ranges start at UTC midnight so each day bucket is complete (7d = today + 6 previous days); 24h is the exact last 24 hours.
+- Both return a `dashboardUrl` that opens the matching chart (`/links/:id?tab=stats&range=&groupBy=`, `/analytics?range=`).
+- UI: `StatsChart` (shadcn `chart` over recharts: line for days, bar for referrers, plus a screen-reader data table), `StatsPanel` on the link's Stats tab with range and group-by read from URL params, and `/analytics` (top links) with `?range=`.
+
+**Tests**
+- `src/analytics/service.test.ts`: range windows, zero-filled days, referrer grouping, ownership and scope, invalid range, top-link ranking scoped to the user, redirect resolution (archived → 404), referrer/user-agent storage.
+- `e2e/analytics.spec.ts`: a short URL 302s and records clicks, unknown slugs 404, the stats tab reads `range`/`groupBy` from the URL, a 30-day chart has 30 entries with 29 zero days, the referrer view, and the top-links page.
+
+**Deviations**
+- The top-links view lives at `/analytics` (the spec names the builder `topLinks` but no path).
+- E2E helpers: `logIn` waits for the post-login redirect, and `gotoReady` waits for network idle before filling forms, because an auth refetch right after navigation can re-render the page and wipe typed values.

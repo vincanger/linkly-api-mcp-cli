@@ -21,4 +21,12 @@ export async function logIn(page: Page, user: TestUser): Promise<void> {
   await page.locator('input[name="password"]').fill(user.password);
   await page.locator('button[type="submit"]').click();
   await page.getByRole("button", { name: "Log out" }).waitFor();
+  await page.waitForURL(/\/links$/);
+  await page.waitForLoadState("networkidle");
+}
+
+/** Navigates and waits until the SPA has finished loading data, so forms don't re-render mid-fill. */
+export async function gotoReady(page: Page, path: string): Promise<void> {
+  await page.goto(path);
+  await page.waitForLoadState("networkidle");
 }

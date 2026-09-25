@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createVerifiedUser, logIn } from "./fixtures/users";
+import { createVerifiedUser, gotoReady, logIn } from "./fixtures/users";
 
 test("links CRUD in the dashboard", async ({ page }) => {
   const user = await createVerifiedUser();
@@ -8,7 +8,7 @@ test("links CRUD in the dashboard", async ({ page }) => {
   await expect(page.getByText("No links yet")).toBeVisible();
 
   // Create (with a prefilled form, as an agent deep link would)
-  await page.goto("/links/new?destinationUrl=https%3A%2F%2Fexample.com%2Fsale&title=Summer&tags=promo,q3");
+  await gotoReady(page, "/links/new?destinationUrl=https%3A%2F%2Fexample.com%2Fsale&title=Summer&tags=promo,q3");
   await expect(page.getByLabel("Destination URL")).toHaveValue("https://example.com/sale");
   await page.getByLabel("Slug").fill("summer-sale");
   await page.getByRole("button", { name: "Create link" }).click();
@@ -26,22 +26,22 @@ test("links CRUD in the dashboard", async ({ page }) => {
   await expect(page.getByText("Saved")).toBeVisible();
 
   // List, search, tag filter
-  await page.goto("/links");
+  await gotoReady(page, "/links");
   await expect(page.getByRole("link", { name: "/r/summer-sale" })).toBeVisible();
-  await page.goto("/links?search=nomatch");
+  await gotoReady(page, "/links?search=nomatch");
   await expect(page.getByText("No links match.")).toBeVisible();
-  await page.goto("/links?tag=promo");
+  await gotoReady(page, "/links?tag=promo");
   await expect(page.getByRole("link", { name: "/r/summer-sale" })).toBeVisible();
 
   // Slug conflict error from the server
-  await page.goto("/links/new");
+  await gotoReady(page, "/links/new");
   await page.getByLabel("Destination URL").fill("https://example.com/other");
   await page.getByLabel("Slug").fill("summer-sale");
   await page.getByRole("button", { name: "Create link" }).click();
   await expect(page.getByText(/already taken/)).toBeVisible();
 
   // Delete with the in-UI confirmation dialog
-  await page.goto("/links");
+  await gotoReady(page, "/links");
   await page.getByRole("button", { name: "Actions for /r/summer-sale" }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.getByRole("button", { name: "Delete link" }).click();
@@ -51,7 +51,7 @@ test("links CRUD in the dashboard", async ({ page }) => {
 test("another user's link is not found", async ({ page }) => {
   const owner = await createVerifiedUser();
   await logIn(page, owner);
-  await page.goto("/links/new");
+  await gotoReady(page, "/links/new");
   await page.getByLabel("Destination URL").fill("https://example.com/private");
   await page.getByRole("button", { name: "Create link" }).click();
   await expect(page).toHaveURL(/\/links\/[0-9a-f-]{36}$/);
@@ -60,6 +60,6 @@ test("another user's link is not found", async ({ page }) => {
   await page.getByRole("button", { name: "Log out" }).click();
   const other = await createVerifiedUser();
   await logIn(page, other);
-  await page.goto(url);
+  await gotoReady(page, url);
   await expect(page.getByText(/not found/)).toBeVisible();
 });

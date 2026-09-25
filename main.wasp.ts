@@ -4,6 +4,7 @@ import { mcpMiddleware, oauthMiddleware, restMiddleware, wellKnownMiddleware } f
 import { serverSetup } from "./src/shared/serverSetup" with { type: "ref" };
 import { appSpec } from "./src/app/app.wasp";
 import { linksSpec } from "./src/links/links.wasp";
+import { analyticsSpec } from "./src/analytics/analytics.wasp";
 import { testingSpec } from "./src/testing/testing.wasp";
 
 // The Wasp Spec only joins the slices. Each slice declares its own pages,
@@ -35,6 +36,7 @@ export default app({
     apiNamespace("/.well-known", { middlewareConfigFn: wellKnownMiddleware }),
     appSpec,
     linksSpec,
+    analyticsSpec,
     testingSpec,
   ],
 });
