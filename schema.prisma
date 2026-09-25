@@ -1,0 +1,124 @@
+datasource db {
+  provider = "postgresql"
+  // Wasp requires that the url is set to the DATABASE_URL environment variable.
+  url      = env("DATABASE_URL")
+}
+
+// Wasp requires the `prisma-client-js` generator to be present.
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id             String          @id @default(uuid())
+  links          Link[]
+  grants         Grant[]
+  accessTokens   AccessToken[]
+  pendingActions PendingAction[]
+}
+
+model Link {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug           String   @unique
+  destinationUrl String
+  title          String?
+  tags           String[] @default([])
+  archived       Boolean  @default(false)
+  clicks         Click[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model Click {
+  id        String   @id @default(uuid())
+  linkId    String
+  link      Link     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  referrer  String? // hostname only
+  userAgent String? // truncated to 200 chars
+
+  @@index([linkId, createdAt])
+}
+
+// One row per "connected app" authorization. Tokens hang off it.
+model Grant {
+  id                 String         @id @default(uuid())
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId           String // the CIMD URL
+  clientName         String
+  scopes             String[]
+  confirmDestructive Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  revokedAt          DateTime?
+  accessTokens       AccessToken[]
+  refreshTokens      RefreshToken[]
+
+  @@index([userId, clientId])
+}
+
+model AccessToken {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique
+  kind       String // "oauth" | "pat"
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantId    String?
+  grant      Grant?    @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  name       String? // PATs only
+  scopes     String[]
+  audience   String? // oauth only: must equal mcpResourceUrl() or `${serverUrl}/api/v1`
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  grantId   String
+  grant     Grant     @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime? // rotation: single use
+  createdAt DateTime  @default(now())
+}
+
+model AuthorizationCode {
+  id                 String    @id @default(uuid())
+  codeHash           String    @unique
+  userId             String
+  clientId           String
+  redirectUri        String
+  codeChallenge      String
+  scopes             String[]
+  resource           String
+  confirmDestructive Boolean
+  grantId            String? // set when the code is exchanged, so code reuse can revoke the grant
+  expiresAt          DateTime // 60 seconds
+  usedAt             DateTime?
+  createdAt          DateTime  @default(now())
+}
+
+model OAuthClientCache {
+  clientId  String   @id // CIMD URL
+  metadata  Json
+  fetchedAt DateTime
+}
+
+model PendingAction {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String // "delete_link"
+  payload     Json // { linkId, slug, destinationUrl } snapshot for display
+  requestedBy String // grant clientName or "api"
+  expiresAt   DateTime // 15 minutes
+  completedAt DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+}
