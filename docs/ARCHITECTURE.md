@@ -12,6 +12,8 @@ Read this first. Linkly is a link shortener, but the product is only the vehicle
 
 ## Vertical slices and the adapter rule
 
+**Watch it first:** [Linkly's Four Ways In](https://claude.ai/artifact/QAS55rqPuKkD1ccAGc6M31) is an animated walkthrough of this section. It sends one "create a link" request through the dashboard, REST, MCP, and the CLI, and shows each one become a `Principal`, pass through a thin adapter, and reach the same `createLink` in `service.ts`. Switch it to "Slug taken" to see one `DomainError` come back as a toast, a `409`, an MCP tool error, and CLI exit code 6.
+
 Code is organized **by feature, not by layer**. Each slice in `src/` owns everything about its feature: Zod schemas, business logic, Wasp operations, REST handlers, MCP tools, OpenAPI paths, UI, tests, and its own Wasp Spec file.
 
 ```
@@ -75,7 +77,7 @@ Scopes and toolsets are defined once in [`src/shared/scopes.ts`](../src/shared/s
 
 ### OAuth from any client
 
-OAuth 2.1 with PKCE and **Client ID Metadata Documents**: the `client_id` is an HTTPS URL serving the client's metadata, so there's no registration step and **no client allowlist**. The consent screen is the security boundary: it shows the client's name and, prominently, the host of its `client_id`, with a note that Linkly hasn't verified the app. See [How OAuth works here](#how-oauth-works-here).
+Any MCP client can connect with no registration step and **no client allowlist**. The consent screen is the security boundary: it shows the client's name and, prominently, the host of its `client_id`, with a note that Linkly hasn't verified the app. The mechanism is in [How OAuth works here](#how-oauth-works-here).
 
 ### The API spec is the baseline
 
@@ -83,7 +85,7 @@ The versioned REST API at `/api/v1` ([`src/links/rest.ts`](../src/links/rest.ts)
 
 ### Same tools, every surface
 
-The dashboard, REST, and MCP call the same services; the CLI calls REST. Two parity tests keep them aligned: dashboard ⇄ MCP ([`parity.test.ts`](../src/mcp/parity.test.ts)) and MCP ⇄ CLI ([`tests/cliParity.test.ts`](../tests/cliParity.test.ts)).
+This is the [adapter rule](#vertical-slices-and-the-adapter-rule) applied to the CLI too: the CLI calls REST, which calls the same services. [`tests/cliParity.test.ts`](../tests/cliParity.test.ts) requires every MCP tool to have a CLI command, or a stated reason why not, so the dashboard ⇄ MCP ⇄ CLI chain stays complete.
 
 ### Every surface says what's destructive
 
@@ -113,7 +115,7 @@ The CLI follows rules that make it safe for agents, each because agents get stuc
 You'll notice Linkly's MCP tools map one to one to REST endpoints. That's deliberate: the tools are the same, and MCP's value is in **how an agent connects and uses them**, not in extra abilities.
 
 1. **No shell needed.** Chat and mobile clients can't run `curl` or a CLI. For them, MCP is the only way in ([`src/mcp/handler.ts`](../src/mcp/handler.ts)).
-2. **Setup is pasting one URL.** The `401` carries a `WWW-Authenticate` header pointing at the protected-resource metadata, which points at the authorization server; CIMD means no registration; the user clicks Allow. That replaces "create a token and explain the API to your agent" ([`src/oauth/`](../src/oauth/), [`src/shared/http.ts`](../src/shared/http.ts)).
+2. **Setup is pasting one URL.** The client discovers the login from a `401`, needs no registration, and the user clicks Allow ([How OAuth works here](#how-oauth-works-here)). That replaces "create a token and explain the API to your agent".
 3. **Tools describe themselves.** On connect, the client gets every tool's name, description, input and output schema, plus the server's instructions, with nothing to configure ([`src/mcp/defineTool.ts`](../src/mcp/defineTool.ts), [`src/mcp/server.ts`](../src/mcp/server.ts)).
 4. **Safety hints clients understand.** Clients act on `readOnlyHint` and `destructiveHint`: auto-running reads, asking before deletes. OpenAPI has no standard equivalent, which is why Linkly's `x-destructive` is a custom extension that most tools ignore.
 5. **Features that only exist on MCP here:** toolsets the user picks on the consent screen, the `confirmUrl` delete flow as a first-class tool result, error text written for agents (`Link "abc" not found. Use list_links to find valid IDs or slugs.`), and docs as resources.
@@ -143,11 +145,15 @@ That's a reasonable evolution, but it would bury the simple architecture this re
 
 Linkly is both the resource server (`/mcp`, `/api/v1`) and the authorization server.
 
+![claude-code-oauth-artifcat](./imgs/claude-code-oauth.png)
+
+This section is the short, code-first version. New to OAuth for agents? Watch [How Claude Code Connects](https://claude.ai/artifact/RMZAmj4Am7cQNUAkW3bMxX), then read [OAuth for agents, explained](OAUTH-FOR-AGENTS.md) for the concepts and common questions.
+
 1. **Discovery.** A request without a token gets `401` and `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource/mcp"` ([`withBearer`](../src/shared/http.ts)). That document ([`metadata.ts`](../src/oauth/metadata.ts)) names the authorization server, whose metadata lists the endpoints.
 2. **Client identity (CIMD).** The client's `client_id` is a URL. [`resolveClient`](../src/oauth/cimd.ts) fetches it with SSRF guards ([`ssrf.ts`](../src/oauth/ssrf.ts): every resolved address is checked at connect time against private, loopback, link-local, and reserved ranges; 5s timeout; 64 KB limit; no redirects), validates that the document's `client_id` matches its URL, and caches it for 24 hours. `http://localhost` client IDs are allowed only in development and test.
 3. **Consent.** [`/oauth/authorize`](../src/oauth/ui/ConsentPage.tsx) is a Wasp page (so it lives on the frontend origin and reuses Wasp's login). A bad `client_id` or `redirect_uri` shows an error and **never redirects**; other problems redirect back with `error=`. Redirect URIs must match exactly, except loopback redirects, which match on any port (RFC 8252).
 4. **Code for tokens.** [`exchangeToken`](../src/oauth/token.ts) verifies the single-use, 60-second code and the PKCE S256 verifier, creates or updates one grant per user and client, and issues a 1-hour access token (audience-bound to `/mcp` or `/api/v1`) and a 30-day refresh token. Refresh tokens rotate on every use; reusing one, or reusing a code, revokes the whole grant.
-5. **Every request.** [`authenticateBearer`](../src/shared/bearer.ts) hashes the token (only SHA-256 hashes are stored), checks expiry, revocation, and audience, and builds the principal's permissions **from the grant**, so edits on the Connections page apply immediately.
+5. **Every request.** [`authenticateBearer`](../src/shared/bearer.ts) hashes the token (only SHA-256 hashes are stored), checks expiry, revocation, and audience, and builds the principal's permissions **from the grant** (see [Toolsets and customization](#toolsets-and-customization)).
 
 ## Testing strategy
 
@@ -155,4 +161,4 @@ Wasp runs client tests only, so tests come in three kinds:
 
 - **Server unit tests** (`npm test`, [`vitest.config.ts`](../vitest.config.ts)): services, OAuth logic, the MCP registry and server (through the SDK's in-memory transport), parity and lint tests, against a real Postgres test database. This works because services never import Wasp.
 - **Live-server tests** (`npm run test:e2e`, [`playwright.config.ts`](../playwright.config.ts)): Playwright starts `wasp start` on the test database and runs browser flows, REST, the MCP SDK client over Streamable HTTP, the complete OAuth flow headless (a local [test client](../e2e/fixtures/testClient.ts) serves its CIMD document and catches the redirect), and the CLI as a subprocess.
-- **Manual checks** that can't be automated (MCP Inspector, a real third-party client, the confirm page on a phone) are listed in [`NOTES.md`](../NOTES.md).
+- **Manual checks** that can't be automated, and their results, are listed in [`NOTES.md`](../NOTES.md#manual-checks-still-to-do).

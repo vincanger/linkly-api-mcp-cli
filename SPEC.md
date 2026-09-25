@@ -933,14 +933,13 @@ Wasp only runs client tests (`wasp test client`) and doesn't support server-side
     - **M5:** connect the MCP SDK `Client` using its OAuth client provider. When the SDK asks to redirect the user, hand the URL to the Playwright page to log in and click Allow, then assert that `tools/list` works and the tool calls succeed.
     - **M7:** with "Require confirmation" on, `delete_link` returns a `confirmUrl`. Playwright opens it, clicks Confirm, and the link is gone.
     - **M8:** a grant with only Analytics ticked sees core and analytics tools only. After unticking a toolset on `/settings/connections`, the next `tools/list` reflects the change.
-- **Manual checklist in `NOTES.md`:** MCP Inspector OAuth flow, one real third-party agent client end-to-end (for example Claude, which needs a public HTTPS URL and a real account, so it can't be automated), and the confirm page on mobile.
+
 
 ---
 
 ## 12. Documentation deliverables
 
 - `README.md`: what Linkly is, how to run it, how to connect an MCP client (just the URL `<serverUrl>/mcp`), and the architecture diagram from section 2.1.
-- `NOTES.md`: per-milestone notes and deviations.
 - `docs/ARCHITECTURE.md`: explains each design principle from section 1 with links to the specific files that implement it. This is the file learners should read first. It must also include:
   - **"MCP vs API vs CLI":** all three are ways for an agent to call the same tools, so what changes is the execution environment and its dependencies. Use MCP when the caller is an agent inside a chat client (OAuth from any client, tool descriptions, annotations, no shell needed). Use REST for raw data access, scripts, and integrations (it's the baseline, and OpenAPI already describes it). Use the CLI when a human or an agent has a shell (composes with pipes and `jq`, easy to debug). Include the rules from 8.3 and why each one exists: agents get stuck on interactive prompts.
   - **"If the MCP tools match the API, why have MCP?":** answer this directly, since learners will notice the tools map one to one to REST. The matching tools are deliberate, and MCP's value is in how an agent connects and uses them, not in extra abilities. Cover each point with a link to the code that implements it:
