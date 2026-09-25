@@ -121,3 +121,56 @@ test.describe("M4: OAuth with CIMD", () => {
     expect(refused.body.error).toBe("invalid_grant");
   });
 });
+
+test.describe("M5: MCP client over OAuth", () => {
+  test("the MCP SDK client completes OAuth headless and calls tools", async ({ page }) => {
+    const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+    const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+    const { UnauthorizedError } = await import("@modelcontextprotocol/sdk/client/auth.js");
+
+    let authorizationUrl: URL | null = null;
+    let verifier = "";
+    let tokens: Record<string, unknown> | undefined;
+    const provider = {
+      get redirectUrl() {
+        return client.redirectUri;
+      },
+      get clientMetadata() {
+        return { client_name: "Test Client", redirect_uris: [client.redirectUri], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" };
+      },
+      // The CIMD URL is our client_id. (The SDK only sends clientMetadataUrl
+      // when it's https, so the local http test client provides it directly.)
+      clientInformation: () => ({ client_id: client.clientId }),
+      tokens: () => tokens as never,
+      saveTokens: (t: Record<string, unknown>) => void (tokens = t),
+      redirectToAuthorization: (url: URL) => void (authorizationUrl = url),
+      saveCodeVerifier: (v: string) => void (verifier = v),
+      codeVerifier: () => verifier,
+    };
+
+    const url = new URL(`${SERVER_URL}/mcp`);
+    const mcpClient = new Client({ name: "oauth-e2e", version: "1.0.0" });
+    let transport = new StreamableHTTPClientTransport(url, { authProvider: provider });
+    await expect(mcpClient.connect(transport)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(authorizationUrl).not.toBeNull();
+    expect(authorizationUrl!.searchParams.get("resource")).toBe(`${SERVER_URL}/mcp`);
+
+    // The "user" logs in and clicks Allow in a real browser.
+    await consent(page, user, authorizationUrl!.toString());
+    await transport.finishAuth(client.lastCallback()!.code!);
+
+    transport = new StreamableHTTPClientTransport(url, { authProvider: provider });
+    await mcpClient.connect(transport);
+    const tools = (await mcpClient.listTools()).tools.map((t) => t.name);
+    expect(tools).toEqual(expect.arrayContaining(["whoami", "list_links", "create_link", "get_link_stats"]));
+    const who = await mcpClient.callTool({ name: "whoami", arguments: {} });
+    expect(who.structuredContent).toMatchObject({ source: "oauth", clientName: "Test Client", confirmDestructive: true });
+    const created = await mcpClient.callTool({ name: "create_link", arguments: { destinationUrl: "https://example.com/oauth" } });
+    expect(created.isError).toBeFalsy();
+    await mcpClient.close();
+
+    // The MCP token is bound to /mcp: the REST API rejects it.
+    const accessToken = (tokens as { access_token: string }).access_token;
+    expect((await apiClient(accessToken)("GET", "/me")).status).toBe(401);
+  });
+});

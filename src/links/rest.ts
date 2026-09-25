@@ -23,7 +23,10 @@ export const restLink: RestLink = byMethod({
   PATCH: withBearer("api", async (req, res, p) => {
     res.json(await links.updateLink(p, { ...(req.body ?? {}), id: String(req.params.id) }, deps));
   }),
+  // Same decision as the MCP tool: immediate, or 202 + confirmUrl for OAuth
+  // connections that require confirmation.
   DELETE: withBearer("api", async (req, res, p) => {
-    res.json(await links.deleteLink(p, { id: String(req.params.id) }, deps));
+    const result = await links.requestDeletion(p, { id: String(req.params.id) }, deps);
+    res.status(result.status === "deleted" ? 200 : 202).json(result);
   }),
 });

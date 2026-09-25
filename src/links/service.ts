@@ -2,6 +2,7 @@
 // rest.ts, mcp.ts) only parse input, build a Principal, and call these.
 import type { Link, Prisma, PrismaClient } from "@prisma/client";
 import { randomInt } from "node:crypto";
+import { createPendingDeletion } from "../deeplinks/pendingActions";
 import { dashboardUrls } from "../deeplinks/urls";
 import { DomainError } from "../shared/errors";
 import { decodeCursor, toPage, type Page } from "../shared/pagination";
@@ -176,4 +177,29 @@ function isUniqueViolation(e: unknown): boolean {
 
 function uniq(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+export type RequestDeletionResult =
+  | { status: "deleted"; id: string; slug: string }
+  | { status: "confirmation_required"; confirmUrl: string; actionId: string; expiresAt: string; message: string };
+
+/**
+ * The single place that decides how a deletion happens, for every surface.
+ * Sessions and PATs delete immediately; OAuth connections whose grant
+ * requires confirmation get a link for the user to confirm in Linkly.
+ */
+export async function requestDeletion(
+  p: Principal,
+  input: { id: string },
+  deps: Deps & { now?: () => Date },
+): Promise<RequestDeletionResult> {
+  requireScope(p, "links:write");
+  if (!p.confirmDestructive) return deleteLink(p, input, deps);
+  const pending = await createPendingDeletion(p, { linkId: parseInput(linkIdSchema, input.id) }, deps);
+  return {
+    status: "confirmation_required",
+    ...pending,
+    message:
+      "Deletion needs confirmation. Share this link with the user; the link will be deleted when they confirm in Linkly. Expires in 15 minutes.",
+  };
 }

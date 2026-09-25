@@ -31,16 +31,16 @@ export const LinkInput = z
   .object({
     destinationUrl: destinationUrlSchema,
     slug: slugSchema.optional().describe("Custom slug. Omit it to get a random 7-character slug."),
-    title: titleSchema.optional(),
-    tags: tagsSchema.optional(),
+    title: titleSchema.optional().describe("Optional human-readable label for the link."),
+    tags: tagsSchema.optional().describe("Up to 10 tags (each up to 30 chars). Stored lowercase."),
   })
   .openapi("LinkInput");
 export type LinkInput = z.infer<typeof LinkInput>;
 
 export const LinkUpdate = z
   .object({
-    destinationUrl: destinationUrlSchema.optional(),
-    slug: slugSchema.optional(),
+    destinationUrl: destinationUrlSchema.optional().describe("New destination URL (http:// or https://)."),
+    slug: slugSchema.optional().describe("New slug. The old short URL stops working."),
     title: titleSchema.nullable().optional().describe("New title. Pass null to remove it."),
     tags: tagsSchema.optional().describe("Replaces the whole tag list."),
     archived: z

@@ -8,6 +8,8 @@ These can't be automated. The Playwright end-to-end tests cover the same flows h
 
 - **MCP Inspector OAuth flow (M4).** Run the app (`wasp start db`, `wasp start`), then `npx @modelcontextprotocol/inspector`. Choose "Streamable HTTP", URL `http://localhost:3001/mcp`, and click Connect. Expected: the Inspector discovers the auth server from the 401, opens `http://localhost:3000/oauth/authorize`, you log in and click Allow, and the Inspector lists Linkly's tools. (The Inspector must publish a CIMD `client_id`; if the installed version only supports Dynamic Client Registration, this check waits for optional milestone M11.)
 
+- **A real third-party MCP client end-to-end (M5).** Needs a public HTTPS URL for Linkly (for example a tunnel such as `cloudflared tunnel --url http://localhost:3001`, with `WASP_SERVER_URL`/`WASP_WEB_CLIENT_URL` set to the public URLs) and a real account in the client. In Claude: Settings → Connectors → Add custom connector → `<public server URL>/mcp`. Expected: Claude opens the Linkly consent page, you click Allow, and asking "list my Linkly links" and "create a short link to https://example.com" works. Then check the grant appears on `/settings/connections`.
+
 ## Decisions made without the author
 
 Choices the spec or docs didn't settle, made conservatively so the build could continue.
@@ -23,6 +25,8 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - **Granted scopes are the chosen toolsets' scopes, limited to what the client requested.** A client that asks only for `links:read` never gets `links:write`, even if the user ticks "Links". With no `scope` parameter, every toolset is offered.
 - **`/.well-known/oauth-protected-resource/api/v1` is served now** (the spec lists it under optional M10), because REST 401s already point to it and OAuth tokens with `resource=/api/v1` are accepted since M4.
 - **Revoking a refresh token at `/oauth/revoke` revokes the whole grant**, including its access tokens (RFC 7009 allows this).
+- **The deletion decision and pending-action service were built in M5** (with `delete_link`), not M7, so the tool never had an unsafe "always delete" phase. M7 adds the confirm page and the rest of the deep-link work.
+- **The MCP transport returns JSON responses** (`enableJsonResponse: true`) rather than SSE streams: every call is a single request/response in stateless mode, so there's nothing to stream. Still standard Streamable HTTP; SDK clients handle both.
 - **Extra columns:** `AuthorizationCode.grantId` (so reusing a code can revoke the grant it created) and `AuthorizationCode.createdAt`, plus an index on `Grant(userId, clientId)`.
 
 ## Environment notes
@@ -123,3 +127,26 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 **Deviations**
 - The "token rejected on `/mcp`" end-to-end assertion runs in M5, when `/mcp` exists. The audience check itself is unit tested here.
 - Wasp's `apiNamespace` for `/.well-known` needed a distinct `middlewareConfigFn` name (see Environment notes).
+
+## M5: MCP core and data tools
+
+**Built**
+- `src/mcp/defineTool.ts`: typed tool definitions (name, title, toolset, scope, description, raw-shape input and output, annotations, handler taking a Principal).
+- `src/mcp/registry.ts`: collects the slices' tools; `toolsFor()` keeps core tools, requires each tool's scope on the principal, and lets `?toolsets=` narrow but never widen.
+- `src/mcp/server.ts`: a fresh `McpServer` per request with name, version, and instructions. Each handler returns `structuredContent` (validated against the output schema) plus a compact JSON text block, turns `DomainError`s into actionable `isError` results, and logs `{ tool, userId, grantId, durationMs, ok }`.
+- `src/mcp/handler.ts`: `POST /mcp`, stateless Streamable HTTP (no session ID), bearer auth with `WWW-Authenticate` discovery on 401; `GET`/`DELETE` return 405.
+- Tools: `whoami` (core), `list_links`, `get_link`, `create_link`, `update_link`, `delete_link` (links), `get_link_stats`, `get_top_links` (analytics).
+- `links.service.requestDeletion` decides for every surface: sessions and PATs delete immediately; OAuth grants with confirmation on get a `PendingAction` and a `confirmUrl`. REST `DELETE` uses it too (200 or 202).
+
+**Tests**
+- `src/mcp/server.test.ts` (SDK client over an in-memory transport): server info and instructions, tool schemas and annotations, create/list/stats/whoami with structured content, actionable errors, PAT delete vs. confirmation-required delete, scope and `?toolsets=` filtering.
+- `src/mcp/parity.test.ts`: every Wasp operation (read from the `*.wasp.ts` files) maps to a tool or a `dashboard-only: <reason>`, and every tool is accounted for.
+- `src/mcp/descriptions.test.ts`: titles, descriptions ≥ 60 chars, `.describe()` on every input field, enum values explained, read-only/destructive annotations, related tools mentioned.
+- `e2e/mcp.integration.spec.ts` (live server, SDK Streamable HTTP client): list tools, create, click, stats, delete with a PAT; confirmation-required deletes over MCP and REST (202) for OAuth grants; 401 + discovery header, 405 for GET, `/api/v1`-audience token rejected on `/mcp`.
+- `e2e/oauth.spec.ts` M5 step: the MCP SDK client's own OAuth flow runs headless (Playwright logs in and clicks Allow), then lists tools and calls `whoami` and `create_link`; its `/mcp` token is rejected by the REST API.
+
+**Deviations**
+- zod v4 doesn't carry a field's description through `.optional()`, so optional fields call `.describe()` again (caught by the description lint test).
+- The SDK only sends CIMD `client_id`s that are https. The end-to-end test's local http test client returns its `client_id` from `clientInformation()` instead, which the SDK uses as-is.
+- The integration test lives in `e2e/mcp.integration.spec.ts` (live server) rather than `src/mcp/integration.test.ts`, per the spec's build setup.
+- Wasp bundles the server into one file with Rollup, so dynamic `import()` in server code breaks the build.
