@@ -150,3 +150,20 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - The SDK only sends CIMD `client_id`s that are https. The end-to-end test's local http test client returns its `client_id` from `clientInformation()` instead, which the SDK uses as-is.
 - The integration test lives in `e2e/mcp.integration.spec.ts` (live server) rather than `src/mcp/integration.test.ts`, per the spec's build setup.
 - Wasp bundles the server into one file with Rollup, so dynamic `import()` in server code breaks the build.
+
+## M6: Docs
+
+**Built**
+- `src/docs/content.ts`: 10 docs as typed data (`getting-started`, `links-and-slugs`, `tags`, `how-clicks-are-counted`, `analytics-ranges`, `connecting-ai-clients`, `toolsets-and-permissions`, `deleting-links`, `rest-api`, `cli`). `{{serverUrl}}` and `{{appUrl}}` placeholders are filled in when read, so examples show this deployment's real URLs.
+- `src/docs/service.ts`: `searchDocs` (title ×3, tag ×2, body term frequency normalized by length, with stopwords and light stemming) and `readDoc`. No auth.
+- REST: `GET /api/v1/docs/search?q=` and `GET /api/v1/docs/:slug` (public, in OpenAPI with `security: []`).
+- MCP (core, always on): `search_docs` and `read_doc`, plus every doc as a `docs://linkly/<slug>` resource (`text/markdown`).
+- UI: `/docs` (index with live search) and `/docs/:slug` (Markdown via `react-markdown`, styled with `@tailwindcss/typography`).
+
+**Tests**
+- `src/docs/service.test.ts`: "how are clicks counted" returns `how-clicks-are-counted` first, plus seven other query → doc rankings, limits, empty queries, URL templating, unknown slugs.
+- `src/mcp/server.test.ts`: docs tools work for a principal with no scopes; resources are listed and readable.
+- `e2e/docs.spec.ts`: public REST docs endpoints; the docs pages search and render. `e2e/mcp.integration.spec.ts` now also calls `search_docs` and lists resources over HTTP.
+
+**Deviations**
+- The dashboard's docs pages import the docs content directly instead of going through Wasp operations (the content is public and bundled), so there are no docs operations; the parity map lists `search_docs` and `read_doc` as covered by those pages.

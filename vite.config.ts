@@ -22,6 +22,7 @@ export default defineConfig({
       "@asteasolutions/zod-to-openapi",
       "class-variance-authority",
       "cn",
+      "react-markdown",
     ],
   },
 });

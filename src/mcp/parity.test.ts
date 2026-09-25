@@ -33,6 +33,8 @@ export const OPERATION_COVERAGE: Record<string, string> = {
 /** Tools with no dashboard operation, and why. */
 export const MCP_ONLY_TOOLS: Record<string, string> = {
   whoami: "agents need to self-orient; the dashboard shows the logged-in user in the header",
+  search_docs: "the dashboard's docs pages read the same content directly (no operation needed)",
+  read_doc: "the dashboard's docs pages read the same content directly (no operation needed)",
 };
 
 function waspOperationNames(): string[] {

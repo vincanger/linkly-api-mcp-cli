@@ -24,6 +24,11 @@ test("MCP over Streamable HTTP: list tools, create, stats, delete", async () => 
       .poll(async () => ((await mcp.call("get_link_stats", { linkId: slug })).structuredContent as { total: number }).total)
       .toBe(1);
 
+    const docs = await mcp.call("search_docs", { query: "how are clicks counted" });
+    expect((docs.structuredContent as { results: { slug: string }[] }).results[0]!.slug).toBe("how-clicks-are-counted");
+    const { resources } = await mcp.client.listResources();
+    expect(resources.map((r) => r.uri)).toContain("docs://linkly/how-clicks-are-counted");
+
     // PATs delete immediately.
     const deleted = await mcp.call("delete_link", { id: slug });
     expect(deleted.structuredContent).toMatchObject({ status: "deleted", slug });

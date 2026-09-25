@@ -2,6 +2,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { accountTools } from "../account/mcp";
 import { analyticsTools } from "../analytics/mcp";
+import { docsTools } from "../docs/mcp";
 import { linksTools } from "../links/mcp";
 import type { Principal } from "../shared/principal";
 import { isToolset, type Toolset } from "../shared/scopes";
@@ -10,7 +11,7 @@ import type { AnyToolDef } from "./defineTool";
 export type RegistryDeps = { prisma: PrismaClient };
 
 export function allTools(deps: RegistryDeps): AnyToolDef[] {
-  return [...accountTools(deps), ...linksTools(deps), ...analyticsTools(deps)];
+  return [...accountTools(deps), ...docsTools(), ...linksTools(deps), ...analyticsTools(deps)];
 }
 
 /**

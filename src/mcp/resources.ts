@@ -1,4 +1,6 @@
-// Resources exposed by the MCP server. Slices contribute them (docs in M6).
+// Resources exposed by the MCP server. Slices contribute them.
+import { docsResources } from "../docs/mcp";
+
 export type ResourceDef = {
   name: string;
   uri: string;
@@ -9,5 +11,5 @@ export type ResourceDef = {
 };
 
 export function allResources(): ResourceDef[] {
-  return [];
+  return [...docsResources()];
 }

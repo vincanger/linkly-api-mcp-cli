@@ -95,6 +95,18 @@ describe("MCP server", () => {
     expect(action.requestedBy).toBe("Claude");
   });
 
+  it("exposes docs as tools for everyone and as docs:// resources", async () => {
+    const { client, call } = await connect(pat([]));
+    const search = await call("search_docs", { query: "how are clicks counted" });
+    expect((search.structuredContent as { results: { slug: string }[] }).results[0]!.slug).toBe("how-clicks-are-counted");
+    const doc = await call("read_doc", { slug: "tags" });
+    expect(doc.structuredContent).toMatchObject({ slug: "tags", title: "Tags" });
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toContain("docs://linkly/how-clicks-are-counted");
+    const read = await client.readResource({ uri: "docs://linkly/tags" });
+    expect(read.contents[0]).toMatchObject({ mimeType: "text/markdown", text: expect.stringContaining("# Tags") });
+  });
+
   it("only lists tools the principal's scopes allow, and ?toolsets= only narrows", async () => {
     const names = async (p: Principal, t?: ("links" | "analytics")[]) => {
       const c = await connectInProcess(p, t);
@@ -103,10 +115,10 @@ describe("MCP server", () => {
       return tools.map((x) => x.name).sort();
     };
     const analyticsOnly = pat(["analytics:read"]);
-    expect(await names(analyticsOnly)).toEqual(["get_link_stats", "get_top_links", "whoami"]);
-    expect(await names(analyticsOnly, ["links"])).toEqual(["whoami"]); // can't widen
-    expect(await names(pat(), ["analytics"])).toEqual(["get_link_stats", "get_top_links", "whoami"]);
+    expect(await names(analyticsOnly)).toEqual(["get_link_stats", "get_top_links", "read_doc", "search_docs", "whoami"]);
+    expect(await names(analyticsOnly, ["links"])).toEqual(["read_doc", "search_docs", "whoami"]); // can't widen
+    expect(await names(pat(), ["analytics"])).toEqual(["get_link_stats", "get_top_links", "read_doc", "search_docs", "whoami"]);
     const readOnly = pat(["links:read"]);
-    expect(await names(readOnly)).toEqual(["get_link", "list_links", "whoami"]);
+    expect(await names(readOnly)).toEqual(["get_link", "list_links", "read_doc", "search_docs", "whoami"]);
   });
 });

@@ -3,6 +3,7 @@
 import { OpenApiGeneratorV31, OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { registerAccountOpenApi } from "../account/openapi";
 import { registerAnalyticsOpenApi } from "../analytics/openapi";
+import { registerDocsOpenApi } from "../docs/openapi";
 import { registerLinksOpenApi } from "../links/openapi";
 import { SCOPES } from "../shared/scopes";
 import { apiResourceUrl, frontendUrl, serverUrl } from "../shared/urls";
@@ -12,6 +13,7 @@ export const SLICE_REGISTRATIONS: ((registry: OpenAPIRegistry) => void)[] = [
   registerAccountOpenApi,
   registerLinksOpenApi,
   registerAnalyticsOpenApi,
+  registerDocsOpenApi,
 ];
 
 export function buildOpenApiDocument() {
