@@ -248,3 +248,52 @@ test.describe("M7: deletions that need confirmation", () => {
     }
   });
 });
+
+test.describe("M8: toolsets", () => {
+  const CORE = ["get_dashboard_url", "read_doc", "search_docs", "whoami"];
+  const ANALYTICS = ["get_link_stats", "get_top_links"];
+  const LINKS = ["create_link", "delete_link", "get_link", "list_links", "update_link"];
+
+  test("a grant with only Analytics sees core + analytics tools; ?toolsets= narrows but never widens", async ({ page }) => {
+    const tokens = await oauthTokens(page, client, user, { uncheck: ["Links"] });
+    expect(tokens.scope).toBe("analytics:read");
+
+    const all = await connectMcp(tokens.access_token);
+    expect(await all.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
+    const denied = await all.call("list_links");
+    expect(denied.isError).toBe(true); // not listed, and not callable either
+    await all.close();
+
+    const widened = await connectMcp(tokens.access_token, "?toolsets=links,analytics");
+    expect(await widened.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
+    await widened.close();
+
+    const narrowed = await connectMcp(tokens.access_token, "?toolsets=links");
+    expect(await narrowed.toolNames()).toEqual(CORE);
+    await narrowed.close();
+  });
+
+  test("editing a grant on the connections page changes the tool list on the next request", async ({ page }) => {
+    const tokens = await oauthTokens(page, client, user);
+    let mcp = await connectMcp(tokens.access_token);
+    expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, ...LINKS].sort());
+    await mcp.close();
+
+    await gotoReady(page, "/settings/connections");
+    const row = page.getByTestId("grant-Test Client");
+    await row.getByLabel("Links", { exact: true }).uncheck();
+    await expect(page.getByText("Toolsets updated")).toBeVisible();
+
+    // Same token, next request: the Links tools are gone.
+    mcp = await connectMcp(tokens.access_token);
+    expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
+    await mcp.close();
+
+    // The confirmation toggle applies immediately too.
+    await row.getByRole("switch", { name: "Require confirmation for Test Client" }).click();
+    await expect(page.getByText("Saved")).toBeVisible();
+    mcp = await connectMcp(tokens.access_token);
+    expect((await mcp.call("whoami")).structuredContent).toMatchObject({ confirmDestructive: false, scopes: ["analytics:read"] });
+    await mcp.close();
+  });
+});

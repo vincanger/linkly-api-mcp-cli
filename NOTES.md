@@ -28,6 +28,7 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - **Revoking a refresh token at `/oauth/revoke` revokes the whole grant**, including its access tokens (RFC 7009 allows this).
 - **The deletion decision and pending-action service were built in M5** (with `delete_link`), not M7, so the tool never had an unsafe "always delete" phase. M7 adds the confirm page and the rest of the deep-link work.
 - **The MCP transport returns JSON responses** (`enableJsonResponse: true`) rather than SSE streams: every call is a single request/response in stateless mode, so there's nothing to stream. Still standard Streamable HTTP; SDK clients handle both.
+- **Editing toolsets on the connections page grants the toolset's full scopes**, even if the app originally asked for less: the human is choosing explicitly there. On the consent screen, grants are still limited to what the app requested.
 - **Extra columns:** `AuthorizationCode.grantId` (so reusing a code can revoke the grant it created) and `AuthorizationCode.createdAt`, plus an index on `Grant(userId, clientId)`.
 
 ## Environment notes
@@ -182,3 +183,14 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - `src/deeplinks/pendingActions.test.ts`: same-user confirm deletes; other user → not found; expired → conflict; twice → conflict; cancel; tokens can't confirm; no-confirmation grants delete immediately.
 - `src/mcp/server.test.ts`: `get_dashboard_url` URLs and the missing-id error.
 - `e2e/oauth.spec.ts` M7 steps: with a real OAuth token (confirmation on by default), `delete_link` returns a confirm URL, the link survives until the user clicks Confirm delete in the browser, then it's gone, and revisiting shows it's already done; a second user sees "not found"; an expired request shows "expired"; with confirmation off, deletion is immediate.
+
+## M8: Toolsets polish
+
+**Built**
+- Toolset selection on the consent screen (M4) and editing on `/settings/connections` (M4), now with optimistic updates: each row shows the change immediately and rolls back with an error toast if saving fails.
+- `?toolsets=` filter on the MCP URL (M5): narrows only; unknown names are ignored.
+- Because principals are built from the grant on every request, edits apply to existing tokens on their next request.
+
+**Tests**
+- `src/mcp/registry.test.ts`: `?toolsets=` parsing (unknown names ignored, arrays rejected) and an unknown-only list leaving just the core tools.
+- `e2e/oauth.spec.ts` M8 steps: a grant approved with only Analytics sees exactly the core + analytics tools, and `list_links` fails if called anyway; `?toolsets=links,analytics` doesn't add Links; `?toolsets=links` leaves only core tools; unticking Links on the connections page removes the Links tools from the same token's next `tools/list`, and flipping the confirmation switch shows up in `whoami` on the next call.
