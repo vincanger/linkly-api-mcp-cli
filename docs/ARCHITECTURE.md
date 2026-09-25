@@ -114,7 +114,7 @@ The CLI follows rules that make it safe for agents, each because agents get stuc
 
 You'll notice Linkly's MCP tools map one to one to REST endpoints. That's deliberate: the tools are the same, and MCP's value is in **how an agent connects and uses them**, not in extra abilities.
 
-1. **No shell needed.** Chat and mobile clients can't run `curl` or a CLI. For them, MCP is the only way in ([`src/mcp/handler.ts`](../src/mcp/handler.ts)).
+1. **No shell needed.** MCP is the standard way chat and mobile clients (Claude, ChatGPT) connect to apps. Their other options are off by default, work in only one client, or make the user handle tokens: a code sandbox with network access, an agent clicking through your UI, or ChatGPT's GPT Actions calling an OpenAPI spec ([`src/mcp/handler.ts`](../src/mcp/handler.ts)).
 2. **Setup is pasting one URL.** The client discovers the login from a `401`, needs no registration, and the user clicks Allow ([How OAuth works here](#how-oauth-works-here)). That replaces "create a token and explain the API to your agent".
 3. **Tools describe themselves.** On connect, the client gets every tool's name, description, input and output schema, plus the server's instructions, with nothing to configure ([`src/mcp/defineTool.ts`](../src/mcp/defineTool.ts), [`src/mcp/server.ts`](../src/mcp/server.ts)).
 4. **Safety hints clients understand.** Clients act on `readOnlyHint` and `destructiveHint`: auto-running reads, asking before deletes. OpenAPI has no standard equivalent, which is why Linkly's `x-destructive` is a custom extension that most tools ignore.

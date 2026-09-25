@@ -23,6 +23,7 @@ Start at the top and go deeper as you need to:
 1. [Linkly's Four Ways In](https://claude.ai/artifact/QAS55rqPuKkD1ccAGc6M31) (animation): one "create a link" request through all four surfaces to the same service function.
 2. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): every design decision, why it was made, and the code that implements it.
 3. [`docs/OAUTH-FOR-AGENTS.md`](docs/OAUTH-FOR-AGENTS.md): how an MCP client logs in with no registration, for newcomers to OAuth.
+4. [`docs/AGENT-READY-APPS.md`](docs/AGENT-READY-APPS.md) covers when to use the options (API, CLI, MCP), auth, and the fastest path. It also includes notes on what Wasp can do to provide these in the future.
 
 For the build itself, [`SPEC.md`](SPEC.md) is the full spec. There still exist some optional implementation milestones.
 
