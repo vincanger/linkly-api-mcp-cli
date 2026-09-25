@@ -1,0 +1,29 @@
+{
+  "name": "linkly",
+  "version": "1.0.0",
+  "description": "Command-line client for Linkly's REST API. Safe for agents: never prompts, JSON when piped, clear exit codes.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "linkly": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "gen": "node scripts/fetch-openapi.mjs && openapi-typescript openapi.json -o src/schema.d.ts",
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3"
+  }
+}

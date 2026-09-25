@@ -9,7 +9,7 @@ export const TEST_DATABASE_URL =
 
 export default defineConfig({
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
     environment: "node",
     globalSetup: ["./src/test/globalSetup.ts"],
     fileParallelism: false, // tests share one database

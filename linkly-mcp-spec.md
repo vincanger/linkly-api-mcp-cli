@@ -728,7 +728,7 @@ Commands mirror the MCP tools one to one:
 | `linkly links list [--search] [--tag] [--archived] [--limit] [--cursor] [--all]` | `GET /links` | `list_links` |
 | `linkly links get <id-or-slug>` | `GET /links/:id` | `get_link` |
 | `linkly links create <url> [--slug] [--title] [--tag ...]` | `POST /links` | `create_link` |
-| `linkly links update <id> [--url] [--slug] [--title] [--tag ...] [--archived]` | `PATCH /links/:id` | `update_link` |
+| `linkly links update <id> [--destination] [--slug] [--title] [--tag ...] [--archived]` | `PATCH /links/:id` | `update_link` |
 | `linkly links delete <id> --yes` | `DELETE /links/:id` | `delete_link` |
 | `linkly stats <id> [--range] [--group-by]` | `GET /links/:id/stats` | `get_link_stats` |
 | `linkly top-links [--range] [--limit]` | `GET /analytics/top-links` | `get_top_links` |

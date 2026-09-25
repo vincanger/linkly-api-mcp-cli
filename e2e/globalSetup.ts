@@ -1,10 +1,16 @@
 import { chromium } from "@playwright/test";
+import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { CLIENT_URL, SERVER_URL } from "./env";
 
 // Playwright waits for the client (port 3000); also wait for the API server,
 // then load the app once so Vite finishes optimizing dependencies before any
 // test fills in a form (a dependency re-optimization reloads the page).
 export default async function globalSetup() {
+  // The CLI tests run the built binary.
+  if (!existsSync("cli/node_modules")) execSync("npm ci", { cwd: "cli", stdio: "inherit" });
+  execSync("npm run build", { cwd: "cli", stdio: "pipe" });
+
   const deadline = Date.now() + 180_000;
   for (;;) {
     try {

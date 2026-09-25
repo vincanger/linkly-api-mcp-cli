@@ -5,8 +5,9 @@ import { CLIENT_URL, TEST_DATABASE_URL } from "./e2e/env";
 // tests, and OpenAPI checks all run against a real `wasp start` using the
 // separate `linkly_test` database. `wasp start` sets NODE_ENV=development.
 export default defineConfig({
-  testDir: "./e2e",
-  testMatch: /.*\.spec\.ts$/,
+  testDir: ".",
+  testMatch: ["e2e/**/*.spec.ts", "cli/test/**/*.spec.ts"],
+  testIgnore: ["**/node_modules/**"],
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
