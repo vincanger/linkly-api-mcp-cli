@@ -83,6 +83,7 @@ model RefreshToken {
   tokenHash String    @unique
   grantId   String
   grant     Grant     @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  resource  String // audience for the access tokens it mints
   expiresAt DateTime
   usedAt    DateTime? // rotation: single use
   createdAt DateTime  @default(now())

@@ -6,7 +6,7 @@ Per-milestone notes and deviations from `linkly-mcp-spec.md`, written while buil
 
 These can't be automated. The Playwright end-to-end tests cover the same flows headless.
 
-- _(filled in as milestones add them)_
+- **MCP Inspector OAuth flow (M4).** Run the app (`wasp start db`, `wasp start`), then `npx @modelcontextprotocol/inspector`. Choose "Streamable HTTP", URL `http://localhost:3001/mcp`, and click Connect. Expected: the Inspector discovers the auth server from the 401, opens `http://localhost:3000/oauth/authorize`, you log in and click Allow, and the Inspector lists Linkly's tools. (The Inspector must publish a CIMD `client_id`; if the installed version only supports Dynamic Client Registration, this check waits for optional milestone M11.)
 
 ## Decisions made without the author
 
@@ -19,6 +19,10 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - **Every link lookup accepts an ID or a slug** (get, update, delete, stats), not only `getLink`: agents often only know the slug.
 - **Service outputs use ISO strings for dates**, so the same object is valid JSON for REST, MCP `structuredContent`, and the CLI.
 - **Random slugs** use a 32-character alphabet without look-alike characters (no `l`, `o`, `0`, `1`).
+- **Where the user returns after logging in during OAuth.** Wasp's login always redirects to `onAuthSucceededRedirectTo`. The consent page stores the full `/oauth/authorize?...` URL in `sessionStorage` before sending the user to `/login`, and the layout sends them back after login (`src/app/returnTo.ts`).
+- **Granted scopes are the chosen toolsets' scopes, limited to what the client requested.** A client that asks only for `links:read` never gets `links:write`, even if the user ticks "Links". With no `scope` parameter, every toolset is offered.
+- **`/.well-known/oauth-protected-resource/api/v1` is served now** (the spec lists it under optional M10), because REST 401s already point to it and OAuth tokens with `resource=/api/v1` are accepted since M4.
+- **Revoking a refresh token at `/oauth/revoke` revokes the whole grant**, including its access tokens (RFC 7009 allows this).
 - **Extra columns:** `AuthorizationCode.grantId` (so reusing a code can revoke the grant it created) and `AuthorizationCode.createdAt`, plus an index on `Grant(userId, clientId)`.
 
 ## Environment notes
@@ -100,3 +104,22 @@ Choices the spec or docs didn't settle, made conservatively so the build could c
 - Wasp's `api()` supports only `GET`, `POST`, `PUT`, `DELETE`, and `ALL`. `PATCH /api/v1/links/:id` is served by an `ALL` route that dispatches by method (`byMethod` in `src/shared/http.ts`) and returns 405 with an `Allow` header for anything else. `/api/v1/links` uses the same helper.
 - The docs REST endpoints move to M6 with the rest of the docs slice (the spec lists them in both M3 and M6).
 - `vite.config.ts` pre-bundles dependencies that are only discovered on some pages, and the Playwright global setup loads the app once before tests. Without this, Vite's first-visit dependency optimization reloads the page mid-test.
+
+## M4: OAuth with CIMD
+
+**Built**
+- Metadata: `/.well-known/oauth-protected-resource` (+ `/mcp`, `/api/v1`) per RFC 9728 and `/.well-known/oauth-authorization-server` per RFC 8414 (`src/oauth/metadata.ts`).
+- CIMD (`src/oauth/cimd.ts`): `client_id` must be an https URL with a path; documents are cached for 24h; `client_id` must match the document; `redirect_uris` required; `client_name` falls back to the host; exact redirect matching with RFC 8252 loopback port flexibility.
+- SSRF guard (`src/oauth/ssrf.ts`): every resolved address is checked at connect time (so DNS rebinding can't bypass it) against private, loopback, link-local, CGNAT, multicast, and reserved ranges, IPv4 and IPv6 (including IPv4-mapped); IP literals are checked up front; 5s timeout, 64 KB limit, no redirects. The local-dev exception (`isAllowedLoopbackClient`) only applies in `development`/`test` and only to the literal hostnames `localhost`, `127.0.0.1`, `[::1]`.
+- Authorize flow: `/oauth/authorize` is a Wasp page (on the frontend origin). It validates through the `getAuthorizeRequest` query; bad `client_id`/`redirect_uri` show an error and never redirect; other problems redirect back with `error=`, `state`, and `iss`. The consent screen shows the client name, the `client_id` host, an "unverified app" note, toolset checkboxes, and the confirmation toggle (default on).
+- Token endpoint (`src/oauth/token.ts`): authorization code with PKCE S256 (codes are 60s, single use; reuse revokes the grant it created), one grant per user + client updated on re-consent, 1h access tokens with `audience = resource`, 30-day refresh tokens with single-use rotation and reuse detection (reuse revokes the grant). RFC 6749 error bodies, `Cache-Control: no-store`, form-encoded or JSON bodies.
+- Revocation endpoint (`src/oauth/revoke.ts`, RFC 7009) and the connections page (`/settings/connections`): list grants with host and last use, edit toolsets and the confirmation toggle, revoke.
+
+**Tests**
+- `src/oauth/cimd.test.ts`: client_id URL rules, document validation (client_id mismatch, empty redirect_uris), redirect matching (exact, loopback any-port), blocked address ranges, local-dev exception (accepted in `test`, rejected in `production`), `10.0.0.5` and a hostname resolving to `127.0.0.1` rejected in every environment, `http://169.254.169.254` refused, 24h cache.
+- `src/oauth/token.test.ts`: authorize validation and redirectable errors, deny, scope limiting, PKCE failure, redirect/client mismatch, code reuse revoking the grant, expired codes, grant reuse on re-consent, refresh rotation, refresh reuse detection revoking the grant, revocation.
+- `e2e/oauth.spec.ts` (Playwright, headless): metadata endpoints; log in from the consent redirect, check client name and host, untick Analytics, Allow, exchange the code, use the token on `GET /api/v1/me` (analytics → 403), refresh rotation and reuse detection; Deny → `access_denied`; unknown `redirect_uri` → error page with no redirect; the connections page revokes the grant.
+
+**Deviations**
+- The "token rejected on `/mcp`" end-to-end assertion runs in M5, when `/mcp` exists. The audience check itself is unit tested here.
+- Wasp's `apiNamespace` for `/.well-known` needed a distinct `middlewareConfigFn` name (see Environment notes).

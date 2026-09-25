@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { Toaster } from "../components/ui/sonner";
 import { cn } from "../lib/utils";
 import "../Main.css";
+import { useReturnAfterLogin } from "./returnTo";
 
 const NAV = [
   { to: "/links", label: "Links" },
@@ -16,6 +17,7 @@ const NAV = [
 export function Layout() {
   const { data: user } = useAuth();
   const { pathname } = useLocation();
+  useReturnAfterLogin(!!user);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

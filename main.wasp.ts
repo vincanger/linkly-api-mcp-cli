@@ -9,6 +9,7 @@ import { testingSpec } from "./src/testing/testing.wasp";
 import { accountSpec } from "./src/account/account.wasp";
 import { tokensSpec } from "./src/tokens/tokens.wasp";
 import { openapiSpec } from "./src/openapi/openapi.wasp";
+import { oauthSpec } from "./src/oauth/oauth.wasp";
 
 // The Wasp Spec only joins the slices. Each slice declares its own pages,
 // routes, operations, and APIs in its `<slice>.wasp.ts` file.
@@ -43,6 +44,7 @@ export default app({
     accountSpec,
     tokensSpec,
     openapiSpec,
+    oauthSpec,
     testingSpec,
   ],
 });
