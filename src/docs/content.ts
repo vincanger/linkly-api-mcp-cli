@@ -88,9 +88,9 @@ Every stats result includes a \`dashboardUrl\` that opens the same chart in Link
 {{serverUrl}}/mcp
 \`\`\`
 
-The assistant opens Linkly's consent page. Check which [toolsets](/docs/toolsets-and-permissions) it may use, choose whether deletions need your confirmation, and click **Allow**. There's no API key to copy and no app registration: Linkly accepts any app that publishes a client metadata document, and shows you its address before you approve.
+The assistant opens Linkly's consent page. Pick what it [may do](/docs/toolsets-and-permissions) (for example, view your links but not change them), choose whether deletions need your confirmation, and click **Allow**. There's no API key to copy and no app registration: Linkly accepts any app that publishes a client metadata document, and shows you its address before you approve.
 
-**Manage** connected apps on [Connections]({{appUrl}}/settings/connections): change toolsets, toggle confirmations, or disconnect. Changes apply on the app's next request.
+**Manage** connected apps on [Connections]({{appUrl}}/settings/connections): change permissions, toggle confirmations, or disconnect. Changes apply on the app's next request.
 
 For clients that only support a static header, create a [personal access token]({{appUrl}}/settings/tokens) and send \`Authorization: Bearer <token>\`.`,
   },
@@ -106,7 +106,7 @@ For clients that only support a static header, create a [personal access token](
 | \`links:write\` | Create, edit, and delete your links |
 | \`analytics:read\` | View click analytics |
 
-On the consent screen, scopes are grouped into **toolsets**: **Links** (\`links:read\`, \`links:write\`) and **Analytics** (\`analytics:read\`). An app only gets the scopes it asked for and you approved, and only sees the MCP tools those scopes allow.
+On the consent screen, each scope is its own checkbox, grouped into **toolsets**: **Links** (\`links:read\`, \`links:write\`) and **Analytics** (\`analytics:read\`). You can allow viewing links without allowing changes. Ticking a write scope also ticks its read scope, since changing a link also shows it. An app only gets the scopes it asked for and you approved, and only sees the MCP tools those scopes allow. On Connections you can remove scopes later or restore them, up to what the app asked for.
 
 Some tools are always available because they don't touch your data: \`whoami\`, \`search_docs\`, \`read_doc\`, and \`get_dashboard_url\`.
 

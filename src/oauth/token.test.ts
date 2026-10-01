@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { authenticateBearer } from "../shared/bearer";
 import { principalFromSession, type Principal } from "../shared/principal";
+import { ALL_SCOPES } from "../shared/scopes";
 import { createTestUser, prisma, resetDb } from "../test/db";
 import { approveAuthorization, denyAuthorization, validateAuthorizeRequest, type AuthorizeParams } from "./authorize";
 import { InvalidClientError } from "./cimd";
@@ -35,11 +36,11 @@ function authParams(verifier: string, overrides: Partial<AuthorizeParams> = {}):
   };
 }
 
-async function authorize(opts: { toolsets?: ("links" | "analytics")[]; confirmDestructive?: boolean; params?: Partial<AuthorizeParams> } = {}) {
+async function authorize(opts: { scopes?: string[]; confirmDestructive?: boolean; params?: Partial<AuthorizeParams> } = {}) {
   const verifier = randomBytes(32).toString("base64url");
   const { redirectTo } = await approveAuthorization(
     user,
-    { params: authParams(verifier, opts.params), toolsets: opts.toolsets ?? ["links", "analytics"], confirmDestructive: opts.confirmDestructive ?? true },
+    { params: authParams(verifier, opts.params), scopes: opts.scopes ?? [...ALL_SCOPES], confirmDestructive: opts.confirmDestructive ?? true },
     deps,
   );
   const url = new URL(redirectTo);
@@ -50,9 +51,9 @@ const exchange = (code: string, verifier: string, extra: Record<string, string> 
   exchangeToken({ grant_type: "authorization_code", code, code_verifier: verifier, client_id: CLIENT_ID, redirect_uri: REDIRECT, ...extra }, deps);
 
 describe("authorization request", () => {
-  it("returns the client, requested scopes, and default toolsets", async () => {
+  it("returns the client and the requested scopes", async () => {
     const req = await validateAuthorizeRequest(authParams("v".repeat(43), { scope: "analytics:read" }), deps);
-    expect(req).toMatchObject({ ok: true, clientName: "Example Client", clientHost: "client.example.com", requestedScopes: ["analytics:read"], defaultToolsets: ["analytics"], resource: MCP });
+    expect(req).toMatchObject({ ok: true, clientName: "Example Client", clientHost: "client.example.com", requestedScopes: ["analytics:read"], resource: MCP });
   });
 
   it("never redirects for a bad redirect_uri or client", async () => {
@@ -81,15 +82,23 @@ describe("authorization request", () => {
   });
 
   it("limits granted scopes to what the client requested", async () => {
-    const { code, verifier } = await authorize({ params: { scope: "links:read" }, toolsets: ["links", "analytics"] });
+    const { code, verifier } = await authorize({ params: { scope: "links:read" } });
     const res = await exchange(code, verifier);
     expect(res.status === 200 && res.body.scope).toBe("links:read");
+  });
+
+  it("lets the user grant read without write, and remembers what the client asked for", async () => {
+    const { code, verifier } = await authorize({ scopes: ["links:read", "analytics:read"] });
+    const res = await exchange(code, verifier);
+    expect(res.status === 200 && res.body.scope).toBe("links:read analytics:read");
+    const grant = await prisma.grant.findFirstOrThrow({ where: { userId: user.userId } });
+    expect(grant).toMatchObject({ scopes: ["links:read", "analytics:read"], requestedScopes: ALL_SCOPES });
   });
 });
 
 describe("token endpoint: authorization_code", () => {
   it("issues tokens bound to the grant and the resource", async () => {
-    const { code, verifier, url } = await authorize({ toolsets: ["analytics"], confirmDestructive: false });
+    const { code, verifier, url } = await authorize({ scopes: ["analytics:read"], confirmDestructive: false });
     expect(url.searchParams.get("state")).toBe("xyz");
     expect(url.searchParams.get("iss")).toBe("http://localhost:3001");
     const res = await exchange(code, verifier);
@@ -144,9 +153,9 @@ describe("token endpoint: authorization_code", () => {
   });
 
   it("reuses one grant per user and client, updating it on re-consent", async () => {
-    const a = await authorize({ toolsets: ["links", "analytics"] });
+    const a = await authorize();
     await exchange(a.code, a.verifier);
-    const b = await authorize({ toolsets: ["analytics"], confirmDestructive: false });
+    const b = await authorize({ scopes: ["analytics:read"], confirmDestructive: false });
     await exchange(b.code, b.verifier);
     const grants = await prisma.grant.findMany({ where: { userId: user.userId } });
     expect(grants).toHaveLength(1);

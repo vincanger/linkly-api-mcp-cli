@@ -47,7 +47,7 @@ test.describe("M4: OAuth with CIMD", () => {
     await expect(page.getByTestId("client-name")).toHaveText("Test Client");
     await expect(page.getByTestId("client-host")).toHaveText("localhost");
     await expect(page.getByText("Linkly hasn't verified this app")).toBeVisible();
-    await page.getByLabel("Analytics", { exact: true }).uncheck();
+    await page.getByLabel("View click analytics", { exact: true }).uncheck();
     await page.getByRole("button", { name: "Allow" }).click();
     await page.waitForURL(/127\.0\.0\.1:\d+\/callback/);
 
@@ -249,13 +249,14 @@ test.describe("M7: deletions that need confirmation", () => {
   });
 });
 
-test.describe("M8: toolsets", () => {
+test.describe("M8: toolsets and scopes", () => {
   const CORE = ["get_dashboard_url", "read_doc", "search_docs", "whoami"];
   const ANALYTICS = ["get_link_stats", "get_top_links"];
   const LINKS = ["create_link", "delete_link", "get_link", "list_links", "update_link"];
 
   test("a grant with only Analytics sees core + analytics tools; ?toolsets= narrows but never widens", async ({ page }) => {
-    const tokens = await oauthTokens(page, client, user, { uncheck: ["Links"] });
+    // Unticking read also unticks write for the same resource.
+    const tokens = await oauthTokens(page, client, user, { uncheck: ["View your links"] });
     expect(tokens.scope).toBe("analytics:read");
 
     const all = await connectMcp(tokens.access_token);
@@ -273,6 +274,16 @@ test.describe("M8: toolsets", () => {
     await narrowed.close();
   });
 
+  test("read without write: the agent can look at links but not change them", async ({ page }) => {
+    const tokens = await oauthTokens(page, client, user, { uncheck: ["Create, edit, and delete your links"] });
+    expect(tokens.scope).toBe("links:read analytics:read");
+
+    const mcp = await connectMcp(tokens.access_token);
+    expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, "get_link", "list_links"].sort());
+    expect((await mcp.call("create_link", { destinationUrl: "https://example.com" })).isError).toBe(true);
+    await mcp.close();
+  });
+
   test("editing a grant on the connections page changes the tool list on the next request", async ({ page }) => {
     const tokens = await oauthTokens(page, client, user);
     let mcp = await connectMcp(tokens.access_token);
@@ -281,8 +292,8 @@ test.describe("M8: toolsets", () => {
 
     await gotoReady(page, "/settings/connections");
     const row = page.getByTestId("grant-Test Client");
-    await row.getByLabel("Links", { exact: true }).uncheck();
-    await expect(page.getByText("Toolsets updated")).toBeVisible();
+    await row.getByLabel("View your links", { exact: true }).uncheck();
+    await expect(page.getByText("Permissions updated")).toBeVisible();
 
     // Same token, next request: the Links tools are gone.
     mcp = await connectMcp(tokens.access_token);

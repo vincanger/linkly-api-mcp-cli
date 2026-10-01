@@ -25,6 +25,7 @@ export async function createOAuthTokenFor(
       clientId: "https://client.example.com/meta.json",
       clientName: opts.clientName ?? "Integration Client",
       scopes: opts.scopes,
+      requestedScopes: opts.scopes,
       confirmDestructive: opts.confirmDestructive,
     },
   });

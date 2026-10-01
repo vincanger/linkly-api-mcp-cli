@@ -14,15 +14,13 @@ import {
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
 import { Button } from "../../components/ui/button";
-import { Checkbox } from "../../components/ui/checkbox";
-import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { ALL_TOOLSETS, TOOLSETS, type Toolset } from "../../shared/scopes";
+import type { Scope } from "../../shared/scopes";
 import type { GrantOut } from "../grants";
+import { ScopeChecklist } from "./ScopeChecklist";
 
-
-/** Connected apps: edit toolsets and the confirmation toggle, or revoke. Changes apply on the app's next request. */
+/** Connected apps: edit permissions and the confirmation toggle, or revoke. Changes apply on the app's next request. */
 export function ConnectionsPage() {
   const { data: grants, error } = useQuery(getGrants);
 
@@ -40,7 +38,7 @@ export function ConnectionsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>App</TableHead>
-              <TableHead>Toolsets</TableHead>
+              <TableHead>Permissions</TableHead>
               <TableHead>Confirm deletions</TableHead>
               <TableHead>Connected</TableHead>
               <TableHead>Last used</TableHead>
@@ -67,19 +65,19 @@ export function ConnectionsPage() {
 
 /** One connected app. Edits show immediately and roll back if saving fails. */
 function GrantRow({ grant: g }: { grant: GrantOut }) {
-  const [toolsets, setToolsets] = useState<Toolset[]>(g.toolsets);
+  const [scopes, setScopes] = useState<Scope[]>(g.scopes);
   const [confirm, setConfirm] = useState(g.confirmDestructive);
-  useEffect(() => setToolsets(g.toolsets), [g.toolsets]);
+  useEffect(() => setScopes(g.scopes), [g.scopes]);
   useEffect(() => setConfirm(g.confirmDestructive), [g.confirmDestructive]);
 
-  async function saveToolsets(next: Toolset[]) {
-    const previous = toolsets;
-    setToolsets(next);
+  async function saveScopes(next: Scope[]) {
+    const previous = scopes;
+    setScopes(next);
     try {
-      await updateGrant({ id: g.id, toolsets: next });
-      toast.success("Toolsets updated");
+      await updateGrant({ id: g.id, scopes: next });
+      toast.success("Permissions updated");
     } catch (e) {
-      setToolsets(previous);
+      setScopes(previous);
       toast.error(errorMessage(e));
     }
   }
@@ -102,18 +100,7 @@ function GrantRow({ grant: g }: { grant: GrantOut }) {
         <div className="text-sm text-muted-foreground">{g.clientHost}</div>
       </TableCell>
       <TableCell>
-        <div className="flex flex-col gap-1.5">
-          {ALL_TOOLSETS.map((t) => (
-            <div key={t} className="flex items-center gap-2">
-              <Checkbox
-                id={`${g.id}-${t}`}
-                checked={toolsets.includes(t)}
-                onCheckedChange={(checked) => saveToolsets(checked ? [...toolsets, t] : toolsets.filter((x) => x !== t))}
-              />
-              <Label htmlFor={`${g.id}-${t}`} className="font-normal">{TOOLSETS[t].label}</Label>
-            </div>
-          ))}
-        </div>
+        <ScopeChecklist idPrefix={g.id} offered={g.requestedScopes} selected={scopes} onChange={saveScopes} />
       </TableCell>
       <TableCell>
         <Switch aria-label={`Require confirmation for ${g.clientName}`} checked={confirm} onCheckedChange={saveConfirm} />

@@ -52,6 +52,7 @@ model Grant {
   clientId           String // the CIMD URL
   clientName         String
   scopes             String[]
+  requestedScopes    String[] // what the app asked for: editing the grant can't go beyond it
   confirmDestructive Boolean        @default(true)
   createdAt          DateTime       @default(now())
   revokedAt          DateTime?
@@ -97,6 +98,7 @@ model AuthorizationCode {
   redirectUri        String
   codeChallenge      String
   scopes             String[]
+  requestedScopes    String[]
   resource           String
   confirmDestructive Boolean
   grantId            String? // set when the code is exchanged, so code reuse can revoke the grant

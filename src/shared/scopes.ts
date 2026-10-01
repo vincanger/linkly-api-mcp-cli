@@ -33,10 +33,23 @@ export function normalizeScopes(values: Iterable<string>): Scope[] {
   return ALL_SCOPES.filter((s) => wanted.has(s));
 }
 
-export function scopesForToolsets(toolsets: Iterable<Toolset>): Scope[] {
-  const scopes: Scope[] = [];
-  for (const t of toolsets) scopes.push(...TOOLSETS[t].scopes);
-  return normalizeScopes(scopes);
+/** The scopes a user picked, limited to a ceiling (what the app asked for). */
+export function capScopes(chosen: Iterable<string>, ceiling: Iterable<string>): Scope[] {
+  const allowed = new Set(ceiling);
+  return normalizeScopes(chosen).filter((s) => allowed.has(s));
+}
+
+/**
+ * Checkbox logic for every scope picker. Write access can already read
+ * (update_link returns the link), so write without read would be a false
+ * promise: ticking write ticks read, and unticking read unticks write.
+ */
+export function toggleScope(selected: readonly Scope[], scope: Scope, checked: boolean): Scope[] {
+  const resource = scope.split(":")[0];
+  const read = `${resource}:read`;
+  const write = `${resource}:write`;
+  if (checked) return normalizeScopes([...selected, scope, ...(scope === write ? [read] : [])]);
+  return selected.filter((s) => s !== scope && !(scope === read && s === write));
 }
 
 /** A toolset is granted when every one of its scopes is granted. */

@@ -3,7 +3,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { generateSecret, sha256Hex, TOKEN_PREFIX } from "../shared/crypto";
 import { requireSession, type Principal } from "../shared/principal";
-import { ALL_TOOLSETS, isScope, normalizeScopes, scopesForToolsets, TOOLSETS, type Scope, type Toolset } from "../shared/scopes";
+import { ALL_SCOPES, capScopes, isScope, normalizeScopes, type Scope } from "../shared/scopes";
 import { apiResourceUrl, mcpResourceUrl, serverUrl } from "../shared/urls";
 import { InvalidClientError, redirectUriMatches, resolveClient, type CimdDeps } from "./cimd";
 
@@ -29,10 +29,8 @@ export type ValidAuthorizeRequest = {
   codeChallenge: string;
   state?: string;
   resource: string;
-  /** Scopes the client asked for (all scopes if it didn't ask). */
+  /** Scopes the client asked for (all scopes if it didn't ask). The consent screen offers these, pre-checked. */
   requestedScopes: Scope[];
-  /** Toolsets to pre-check on the consent screen. */
-  defaultToolsets: Toolset[];
 };
 
 /** A problem the client should hear about: the page redirects back with `error=`. */
@@ -81,7 +79,7 @@ export async function validateAuthorizeRequest(
     if (unknown.length) return fail("invalid_scope", `Unknown scope: ${unknown.join(", ")}.`);
     requestedScopes = normalizeScopes(requested);
   } else {
-    requestedScopes = normalizeScopes(Object.values(TOOLSETS).flatMap((t) => t.scopes));
+    requestedScopes = [...ALL_SCOPES];
   }
 
   const resource = params.resource ? params.resource.replace(/\/+$/, "") : mcpResourceUrl();
@@ -99,25 +97,18 @@ export async function validateAuthorizeRequest(
     state: params.state,
     resource,
     requestedScopes,
-    defaultToolsets: ALL_TOOLSETS.filter((t) => TOOLSETS[t].scopes.some((s) => requestedScopes.includes(s))),
   };
-}
-
-/** Granted scopes: the chosen toolsets' scopes, limited to what the client asked for. */
-export function grantedScopes(toolsets: Toolset[], requestedScopes: Scope[]): Scope[] {
-  return scopesForToolsets(toolsets).filter((s) => requestedScopes.includes(s));
 }
 
 export async function approveAuthorization(
   p: Principal,
-  input: { params: AuthorizeParams; toolsets: Toolset[]; confirmDestructive: boolean },
+  input: { params: AuthorizeParams; scopes: string[]; confirmDestructive: boolean },
   deps: CimdDeps & { prisma: PrismaClient },
 ): Promise<{ redirectTo: string }> {
   requireSession(p, "Approving an app");
   const req = await validateAuthorizeRequest(input.params, deps);
   if (!req.ok) return { redirectTo: req.redirectTo };
 
-  const toolsets = input.toolsets.filter((t) => ALL_TOOLSETS.includes(t));
   const code = generateSecret(TOKEN_PREFIX.code);
   const now = (deps.now ?? (() => new Date()))();
   await deps.prisma.authorizationCode.create({
@@ -127,7 +118,9 @@ export async function approveAuthorization(
       clientId: req.clientId,
       redirectUri: req.redirectUri,
       codeChallenge: req.codeChallenge,
-      scopes: grantedScopes(toolsets, req.requestedScopes),
+      // Granted: what the user ticked, never more than the client asked for.
+      scopes: capScopes(input.scopes, req.requestedScopes),
+      requestedScopes: req.requestedScopes,
       resource: req.resource,
       confirmDestructive: input.confirmDestructive,
       expiresAt: new Date(now.getTime() + CODE_TTL_MS),

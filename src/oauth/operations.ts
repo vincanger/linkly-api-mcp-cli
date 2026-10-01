@@ -8,7 +8,6 @@ import type {
   RevokeGrant,
   UpdateGrant,
 } from "wasp/server/operations";
-import type { Toolset } from "../shared/scopes";
 import { runOperation } from "../shared/waspErrors";
 import { sessionPrincipal } from "../shared/waspSession";
 import * as authorize from "./authorize";
@@ -26,7 +25,7 @@ export const getAuthorizeRequest: GetAuthorizeRequest<
   });
 
 export const approveAuthorization: ApproveAuthorization<
-  { params: authorize.AuthorizeParams; toolsets: Toolset[]; confirmDestructive: boolean },
+  { params: authorize.AuthorizeParams; scopes: string[]; confirmDestructive: boolean },
   { redirectTo: string }
 > = (args, context) => runOperation(() => authorize.approveAuthorization(sessionPrincipal(context), args, deps));
 
@@ -36,7 +35,7 @@ export const denyAuthorization: DenyAuthorization<{ params: authorize.AuthorizeP
 export const getGrants: GetGrants<void, grants.GrantOut[]> = (_args, context) =>
   runOperation(() => grants.listGrants(sessionPrincipal(context), deps));
 
-export const updateGrant: UpdateGrant<{ id: string; toolsets?: Toolset[]; confirmDestructive?: boolean }, void> = (args, context) =>
+export const updateGrant: UpdateGrant<{ id: string; scopes?: string[]; confirmDestructive?: boolean }, void> = (args, context) =>
   runOperation(() => grants.updateGrant(sessionPrincipal(context), args, deps));
 
 export const revokeGrant: RevokeGrant<{ id: string }, void> = (args, context) =>

@@ -24,7 +24,7 @@ import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "../../comp
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { ALL_SCOPES, SCOPES, type Scope } from "../../shared/scopes";
+import { ALL_SCOPES, SCOPES, toggleScope, type Scope } from "../../shared/scopes";
 
 const EXPIRY_OPTIONS = [
   { value: "30", label: "30 days" },
@@ -93,9 +93,7 @@ export function TokensPage() {
                     <Checkbox
                       id={`scope-${scope}`}
                       checked={scopes.includes(scope)}
-                      onCheckedChange={(checked) =>
-                        setScopes((s) => (checked ? [...s, scope] : s.filter((x) => x !== scope)))
-                      }
+                      onCheckedChange={(checked) => setScopes((s) => toggleScope(s, scope, checked === true))}
                     />
                     <FieldLabel htmlFor={`scope-${scope}`} className="font-normal">
                       {SCOPES[scope]} <code className="text-xs text-muted-foreground">{scope}</code>

@@ -7,12 +7,12 @@ import { rememberReturnTo } from "../../app/returnTo";
 import { errorMessage } from "../../app/ui/errors";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/card";
-import { Checkbox } from "../../components/ui/checkbox";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "../../components/ui/field";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Switch } from "../../components/ui/switch";
-import { ALL_TOOLSETS, SCOPES, TOOLSETS, type Toolset } from "../../shared/scopes";
+import type { Scope } from "../../shared/scopes";
 import type { AuthorizeParams } from "../authorize";
+import { ScopeChecklist } from "./ScopeChecklist";
 
 const PARAM_KEYS = ["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope", "resource"] as const;
 
@@ -47,7 +47,7 @@ export function ConsentPage() {
     if (data && !data.ok) window.location.assign(data.redirectTo);
   }, [data]);
 
-  const [toolsets, setToolsets] = useState<Toolset[] | null>(null);
+  const [scopes, setScopes] = useState<Scope[] | null>(null);
   const [confirmDestructive, setConfirmDestructive] = useState(true);
   const [submitting, setSubmitting] = useState<"allow" | "deny" | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -71,8 +71,7 @@ export function ConsentPage() {
     );
   }
 
-  const selected = toolsets ?? data.defaultToolsets;
-  const offered = ALL_TOOLSETS.filter((t) => TOOLSETS[t].scopes.some((s) => data.requestedScopes.includes(s)));
+  const selected = scopes ?? data.requestedScopes;
 
   async function submit(kind: "allow" | "deny") {
     setSubmitting(kind);
@@ -80,7 +79,7 @@ export function ConsentPage() {
     try {
       const { redirectTo } =
         kind === "allow"
-          ? await approveAuthorization({ params, toolsets: selected, confirmDestructive })
+          ? await approveAuthorization({ params, scopes: selected, confirmDestructive })
           : await denyAuthorization({ params });
       window.location.assign(redirectTo);
     } catch (e) {
@@ -110,23 +109,7 @@ export function ConsentPage() {
           <FieldSet>
             <FieldLegend variant="label">What it can do</FieldLegend>
             <FieldDescription>Searching docs and opening dashboard links are always allowed.</FieldDescription>
-            {offered.map((t) => (
-              <Field key={t} orientation="horizontal">
-                <Checkbox
-                  id={`toolset-${t}`}
-                  checked={selected.includes(t)}
-                  onCheckedChange={(checked) =>
-                    setToolsets(checked ? [...selected, t] : selected.filter((x) => x !== t))
-                  }
-                />
-                <FieldContent>
-                  <FieldLabel htmlFor={`toolset-${t}`}>{TOOLSETS[t].label}</FieldLabel>
-                  <FieldDescription>
-                    {TOOLSETS[t].scopes.filter((s) => data.requestedScopes.includes(s)).map((s) => SCOPES[s]).join(" · ")}
-                  </FieldDescription>
-                </FieldContent>
-              </Field>
-            ))}
+            <ScopeChecklist idPrefix="scope" offered={data.requestedScopes} selected={selected} onChange={setScopes} />
           </FieldSet>
           <Field orientation="horizontal">
             <Switch id="confirm-destructive" checked={confirmDestructive} onCheckedChange={setConfirmDestructive} />

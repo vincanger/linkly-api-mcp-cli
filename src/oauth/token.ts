@@ -70,10 +70,17 @@ async function exchangeCode(p: Record<string, string | undefined>, deps: Deps): 
   const grant = existing
     ? await prisma.grant.update({
         where: { id: existing.id },
-        data: { scopes: code.scopes, confirmDestructive: code.confirmDestructive, clientName },
+        data: { scopes: code.scopes, requestedScopes: code.requestedScopes, confirmDestructive: code.confirmDestructive, clientName },
       })
     : await prisma.grant.create({
-        data: { userId: code.userId, clientId: code.clientId, clientName, scopes: code.scopes, confirmDestructive: code.confirmDestructive },
+        data: {
+          userId: code.userId,
+          clientId: code.clientId,
+          clientName,
+          scopes: code.scopes,
+          requestedScopes: code.requestedScopes,
+          confirmDestructive: code.confirmDestructive,
+        },
       });
   await prisma.authorizationCode.update({ where: { id: code.id }, data: { grantId: grant.id } });
 

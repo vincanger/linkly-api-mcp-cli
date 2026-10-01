@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DomainError } from "./errors";
 import { principalFromGrant, principalFromPat, principalFromSession, requireScope, requireSession } from "./principal";
-import { ALL_SCOPES, scopesForToolsets, toolsetsForScopes } from "./scopes";
+import { ALL_SCOPES, capScopes, toggleScope, toolsetsForScopes } from "./scopes";
 
 describe("principals", () => {
   it("gives dashboard sessions every scope and no confirmation step", () => {
@@ -56,9 +56,22 @@ describe("requireSession", () => {
 });
 
 describe("toolsets", () => {
-  it("round-trips between toolsets and scopes", () => {
-    expect(scopesForToolsets(["analytics"])).toEqual(["analytics:read"]);
+  it("counts a toolset only when all of its scopes are granted", () => {
     expect(toolsetsForScopes(["links:read", "links:write"])).toEqual(["links"]);
     expect(toolsetsForScopes(["links:read"])).toEqual([]);
+  });
+});
+
+describe("picking scopes", () => {
+  it("caps the choice at what the app asked for", () => {
+    expect(capScopes(["links:write", "links:read", "analytics:read", "nope"], ["links:read", "links:write"])).toEqual(["links:read", "links:write"]);
+    expect(capScopes(["links:read"], [])).toEqual([]);
+  });
+
+  it("ticks read with write, and unticks write with read", () => {
+    expect(toggleScope(["analytics:read"], "links:write", true)).toEqual(["links:read", "links:write", "analytics:read"]);
+    expect(toggleScope(["links:read", "links:write"], "links:read", false)).toEqual([]);
+    expect(toggleScope(["links:read", "links:write"], "links:write", false)).toEqual(["links:read"]);
+    expect(toggleScope([], "analytics:read", true)).toEqual(["analytics:read"]);
   });
 });
