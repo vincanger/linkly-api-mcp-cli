@@ -73,7 +73,7 @@ Every entity returned by any surface carries a `dashboardUrl`, built by the pure
 
 ### Toolsets and customization
 
-Scopes and toolsets are defined once in [`src/shared/scopes.ts`](../src/shared/scopes.ts). The user picks toolsets on the [consent screen](../src/oauth/ui/ConsentPage.tsx); they're stored as scopes on the grant and editable later on [Connections](../src/oauth/ui/ConnectionsPage.tsx). The [registry](../src/mcp/registry.ts) (`toolsFor`) always includes the core tools, requires each other tool's scope, and lets an optional `?toolsets=` URL parameter narrow (never widen) the list. Because principals are built from the grant on every request, edits apply to existing tokens immediately.
+Scopes and toolsets are defined once in [`src/shared/scopes.ts`](../src/shared/scopes.ts). The user picks scopes on the [consent screen](../src/oauth/ui/ConsentPage.tsx), one checkbox each, grouped by toolset ([`ScopeChecklist`](../src/oauth/ui/ScopeChecklist.tsx)), so read and write are separate choices. Ticking write also ticks read, because write access can already read (`update_link` returns the link). The grant stores the chosen scopes and the ones the app asked for; editing it later on [Connections](../src/oauth/ui/ConnectionsPage.tsx) can narrow or restore scopes, never go beyond the request. The [registry](../src/mcp/registry.ts) (`toolsFor`) always includes the core tools, requires each other tool's scope, and lets an optional `?toolsets=` URL parameter narrow (never widen) the list. Because principals are built from the grant on every request, edits apply to existing tokens immediately.
 
 ### OAuth from any client
 
@@ -126,20 +126,21 @@ The tradeoff: for developers and coding agents with a shell, REST plus the CLI i
 
 [`src/mcp/handler.ts`](../src/mcp/handler.ts) builds a fresh `McpServer` and a `StreamableHTTPServerTransport` with no session ID for every request, and closes both when the response ends. Any instance can serve any request: it scales horizontally with no session affinity and no in-memory state to explain.
 
-The cost: a stateless server **can't send requests to the client**. That rules out two MCP features:
+**Under the protocol version Linkly speaks, that has a cost.** Linkly's MCP SDK (1.30) implements the 2025-11-25 revision, where a server asks the client for something by sending it a request mid-call and waiting for the reply on the same connection. A stateless server can't do that, which rules out two features:
 
 - **Elicitation** (the server asking the user a question mid-call, e.g. "Delete this link? Yes/No").
 - **Push notifications** (telling the client that something changed, e.g. the tool list after a grant is edited).
 
 Linkly uses the portable alternative instead: the `confirmUrl` in the tool result. It works in every client, including the many that only support basic tools, and it moves the decision into the product, where the user sees exactly what will happen.
 
-To add elicitation you would need:
+**The 2026-07-28 revision removes that cost.** It makes the protocol itself stateless: no sessions and no `initialize` handshake. A server that needs the user's input returns an `input_required` result with the question and a `requestState` blob, and the client retries the original call with the answer ("multi round-trip requests"). Change notifications get their own opt-in stream (`subscriptions/listen`). So adding elicitation to Linkly no longer means sessions or sticky routing. It would take:
 
-1. A **stateful transport** with session IDs, and routing so the client's reply reaches the same server instance (sticky sessions or a shared session store).
-2. A **capability check**: only use elicitation when the client declared support for it during initialization.
-3. **`confirmUrl` as the fallback** for every client that doesn't.
+1. An **SDK that speaks 2026-07-28**.
+2. A **capability check**: only ask when the request's declared client capabilities include elicitation.
+3. A **signed `requestState`**, bound to the user and the link and with an expiry, because the spec treats it as input an attacker could have changed.
+4. **`confirmUrl` as the fallback** for every client that doesn't support elicitation.
 
-That's a reasonable evolution, but it would bury the simple architecture this reference is meant to show.
+Until then, `confirmUrl` covers every client, and the confirmation happens in the user's own logged-in session.
 
 ## How OAuth works here
 

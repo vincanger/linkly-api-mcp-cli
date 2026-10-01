@@ -23,7 +23,9 @@ Allow Claude Code to access your Linkly account?
 App address: claude.ai
 Linkly hasn't verified this app.
 
-[x] Links        [x] Analytics
+Links      [x] View your links
+           [x] Create, edit, and delete your links
+Analytics  [x] View click analytics
 [on] Require confirmation for destructive actions
                                     [Deny]  [Allow]
 ```
@@ -31,7 +33,7 @@ Linkly hasn't verified this app.
 Three details make it agent-specific:
 
 - **"App address: claude.ai" with no registration.** Explained [below](#no-registration-client-id-metadata-documents).
-- **Toolset checkboxes.** Standard OAuth scopes, shown as which tools the agent gets. Untick Analytics and the agent never sees those tools.
+- **One checkbox per permission.** Standard OAuth scopes, grouped by toolset, so you can allow viewing links without allowing changes. Untick "View click analytics" and the agent never sees those tools.
 - **"Require confirmation for destructive actions".** If the agent deletes something, you get a link to confirm in Linkly instead of the deletion happening right away.
 
 ## The login, step by step
@@ -96,13 +98,13 @@ The exception to exact matching is **loopback** addresses (`http://127.0.0.1:*`,
 ### Nothing is "registered" after the first connection either
 
 - The **metadata document** is cached for 24 hours (`OAuthClientCache`). That's a cache, not an approval: it's refetched afterwards, so changes to the document are picked up.
-- A **Grant** is created when *you* click Allow. It records your approval for your account only: which app, which toolsets, and whether deletions need confirmation. It stores no redirect URIs. Another user connecting the same app gets their own consent screen and their own grant.
+- A **Grant** is created when *you* click Allow. It records your approval for your account only: which app, which scopes you allowed (and which it asked for), and whether deletions need confirmation. It stores no redirect URIs. Another user connecting the same app gets their own consent screen and their own grant.
 
 ### Where the standard came from
 
 - **IndieAuth.** The IndieWeb community's OAuth profile used URLs as client IDs years ago, because there's no central place to register when every website is its own provider.
 - **The IETF OAuth working group** generalized the idea as the draft "OAuth Client ID Metadata Document" (co-authored by Aaron Parecki, who also wrote much of IndieAuth).
-- **The MCP authorization spec** adopted it for the same reason: every MCP server is its own authorization server, so pre-registering with each one doesn't scale. The November 2025 spec revision recommends CIMD and keeps Dynamic Client Registration as a fallback. Check the current spec for exact wording.
+- **The MCP authorization spec** adopted it for the same reason: every MCP server is its own authorization server, so pre-registering with each one doesn't scale. The November 2025 revision recommended CIMD and kept Dynamic Client Registration as a fallback. The 2026-07-28 revision still recommends CIMD, and deprecates Dynamic Client Registration, keeping it only for backwards compatibility. Check the current spec for exact wording.
 
 It's still an IETF draft, not a final RFC, so client support varies. Claude Code supports it; some versions of the MCP Inspector only support Dynamic Client Registration.
 
@@ -160,4 +162,4 @@ claude mcp add --transport http linkly http://localhost:3001/mcp \
   --header "Authorization: Bearer lk_pat_..."
 ```
 
-Then try "What Linkly account am I connected to?", create a link, ask for its stats, and ask to delete it: with "Require confirmation" on, you get a `/confirm/...` link instead of an immediate deletion. The connection appears on `/settings/connections`, where unticking a toolset removes those tools on the agent's next request.
+Then try "What Linkly account am I connected to?", create a link, ask for its stats, and ask to delete it: with "Require confirmation" on, you get a `/confirm/...` link instead of an immediate deletion. The connection appears on `/settings/connections`, where unticking a permission removes those tools on the agent's next request.

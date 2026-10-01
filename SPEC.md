@@ -25,7 +25,7 @@ These map directly to the design guide the app is meant to teach.
 
 ### Non-goals
 
-Teams/orgs, billing, custom domains, geo-IP accuracy, rate limiting beyond a simple guard, embedding/semantic search for docs, MCP Apps, elicitation, and server-pushed notifications (see §13). Keep these out so the MCP structure stays visible.
+Teams/orgs, billing, custom domains, geo-IP accuracy, rate limiting beyond a simple guard, embedding/semantic search for docs, MCP Apps, elicitation (except optional M12), and server-pushed notifications (see §13). Keep these out so the MCP structure stays visible.
 
 ---
 
@@ -140,11 +140,12 @@ src/
     server.ts           # builds an McpServer for a given principal
     handler.ts          # Wasp api handler for POST /mcp (stateless streamable HTTP)
     resources.ts        # collects resources (docs) from slices
+    confirmations.ts    # optional M12: confirmation_required → URL-mode elicitation
     parity.test.ts
-  discovery/            # optional M10: /.well-known OpenAPI + skills discovery
+  discovery/            # optional M10: llms.txt, prerendered pages, /.well-known OpenAPI
     paths.ts
-    handlers.ts
-    skill.ts            # builds SKILL.md from scopes, OpenAPI registry, docs
+    llmsTxt.ts          # renders llms.txt from the docs slice and the API address
+    vitePlugin.ts       # serves /llms.txt in dev, emits it into the client build
   openapi/
     registry.ts
     handler.ts          # GET /api/v1/openapi.json
@@ -206,7 +207,7 @@ All dashboard UI is built with **shadcn/ui** components on **Tailwind CSS v4**. 
 | `LinkDetailPage` edit/stats tabs | `tabs` (tab state in the URL `?tab=` so deep links work) |
 | `StatsChart` | shadcn `chart` (wraps recharts) plus `select` for range and groupBy |
 | `ConfirmActionPage` | `card`, `button` (no `alert-dialog`; the page itself is the confirmation) |
-| `ConsentPage` | `card`, `checkbox` per toolset, `switch` for "Require confirmation", `button` |
+| `ConsentPage` | `card`, `checkbox` per scope (grouped by toolset), `switch` for "Require confirmation", `button` |
 | `ConnectionsPage` / `TokensPage` | `table`, `switch`, `checkbox`, `dialog` (show the new PAT once, with copy), `alert-dialog` for revoke |
 | Login / signup | wrap Wasp's auth UI in a `card`. Keep Wasp's auth forms and style them to match. |
 | Feedback | `sonner` toasts for mutations, `skeleton` for loading states |
@@ -606,12 +607,12 @@ Dynamic Client Registration (RFC 7591) is not part of the core build. See option
 2. If not logged in, redirect to login and return afterward (preserve the full query string).
 3. Call Wasp query `validateAuthorizeRequest(params)`, which runs CIMD validation and returns `{ clientName, clientHost, requestedScopes }`. On an invalid `client_id` or `redirect_uri`, show an error page and **never redirect**. On other errors, redirect back with `error=`.
 4. `resource`, if present, must be `mcpResourceUrl()` or `${serverUrl}/api/v1`; default to `mcpResourceUrl()`.
-5. Consent UI: toolset checkboxes (default: all toolsets whose scopes were requested; if no `scope` was requested, all toolsets), a "Require confirmation for destructive actions" toggle (default on), and Allow / Deny buttons.
-6. Wasp action `approveAuthorization(...)` creates an `AuthorizationCode` (60s expiry, stores the chosen scopes, `confirmDestructive`, `resource`, PKCE challenge) and returns the redirect URL `redirect_uri?code=...&state=...&iss=...`. The page sets `window.location`.
+5. Consent UI: one checkbox per requested scope, grouped by toolset (default: all requested scopes checked; if no `scope` was requested, all scopes). Ticking a `:write` scope ticks its `:read` scope, and unticking read unticks write. Then a "Require confirmation for destructive actions" toggle (default on), and Allow / Deny buttons.
+6. Wasp action `approveAuthorization(...)` creates an `AuthorizationCode` (60s expiry, stores the chosen scopes capped at the requested ones, the requested scopes, `confirmDestructive`, `resource`, PKCE challenge) and returns the redirect URL `redirect_uri?code=...&state=...&iss=...`. The page sets `window.location`.
 
 **Token endpoint (`token.ts`)**
 
-- `authorization_code`: verify code hash, not used, not expired, `client_id` and `redirect_uri` match, PKCE S256 verifier matches. Mark used. Reusing a code revokes the grant it created. Create or reuse a `Grant` (one per user + clientId; update scopes on re-consent). Issue an access token (1h, `audience = resource`) and a refresh token (30d).
+- `authorization_code`: verify code hash, not used, not expired, `client_id` and `redirect_uri` match, PKCE S256 verifier matches. Mark used. Reusing a code revokes the grant it created. Create or reuse a `Grant` (one per user + clientId; update scopes and requested scopes on re-consent). Issue an access token (1h, `audience = resource`) and a refresh token (30d).
 - `refresh_token`: single-use rotation. Reusing a used refresh token revokes the whole grant.
 - Response: `{ access_token, token_type: "Bearer", expires_in, refresh_token, scope }`.
 - Accept `application/x-www-form-urlencoded`. Errors use RFC 6749 shape: `{ error, error_description }`.
@@ -620,7 +621,7 @@ Dynamic Client Registration (RFC 7591) is not part of the core build. See option
 
 **Where OAuth permissions come from:** for an OAuth token, `bearerAuth` builds the principal's `scopes` and `confirmDestructive` from the token's **Grant** at request time, and rejects the token if the grant is revoked. `AccessToken.scopes` only records what was issued, for display and audit. That's what makes edits on the connections page apply to existing tokens immediately.
 
-**Connections UI (`/settings/connections`):** list grants (client name, client host, toolsets, confirm-destructive toggle, created, last used), edit toolsets and the toggle, revoke. Changes apply to existing tokens immediately because the principal is built from the grant at request time.
+**Connections UI (`/settings/connections`):** list grants (client name, client host, scopes, confirm-destructive toggle, created, last used), edit scopes (only within the scopes the app requested) and the toggle, revoke. Changes apply to existing tokens immediately because the principal is built from the grant at request time.
 
 ---
 
@@ -859,33 +860,59 @@ Build in this order. Each milestone ends with passing tests and a short entry in
 
 Build these only after M0–M9 pass. They don't depend on each other. Each one gets its own `NOTES.md` entry like the core milestones.
 
-**M10: Agent discovery without MCP.** Lets an agent that only has a generic HTTP tool find the REST API, log the user in, and call it, with no MCP server and no client registration. It combines three pieces: CIMD OAuth (already built in M4), OpenAPI discovery at a `/.well-known` path, and skills discovery at a `/.well-known` path.
+**M10: Agent discovery.** Lets an agent that's only told "use linkly.example.com" (the dashboard's address) find out how to connect, then do it: MCP if it supports MCP, otherwise the REST API with OAuth or a personal access token. The only human step left is the one that has to stay: approving on the consent screen, or creating a token. It builds on CIMD OAuth (M4) and adds an entry point on the dashboard's site, with the OpenAPI document also at a `/.well-known` path as a backup.
 
-> **These discovery paths are proposals, not standards.** CIMD is used by the MCP authorization spec, but OpenAPI and skills discovery at `/.well-known` have no agreed paths or formats yet, and few clients look for them. Before building, check for a current proposal and follow it if one exists. Otherwise use the paths below. Either way, keep each path in a single constant in `src/discovery/paths.ts` and record the choice in `NOTES.md`.
+> **Conventions, not standards.** `llms.txt` is a convention ([llmstxt.org](https://llmstxt.org)) that some agents check. OpenAPI discovery at `/.well-known` is a proposal with no agreed path yet, and few clients look for it. Before building, check for a current proposal and follow it if one exists. Otherwise use the paths below. Either way, keep each path in a single constant in `src/discovery/paths.ts` and record the choices in `NOTES.md`.
 
-New slice `src/discovery/`. It adds metadata only: no new business logic and no new data.
+> **Two sites.** Wasp serves the dashboard (static files) and the API server from different addresses. Agents start from the dashboard's address, so what they read first has to be there. Today every dashboard route returns the same empty page shell until JavaScript runs, so fetching the homepage shows an agent nothing.
 
-1. **OAuth discovery for REST.**
-   - Serve `GET /.well-known/oauth-protected-resource/api/v1` with `resource: "${serverUrl}/api/v1"`, the same `authorization_servers` and `scopes_supported` as the `/mcp` document, and `resource_documentation` pointing at the `rest-api` doc.
-   - `bearerAuth("api")` failures return `401` with `WWW-Authenticate: Bearer resource_metadata="<serverUrl>/.well-known/oauth-protected-resource/api/v1"`, matching what `/mcp` already does.
-2. **OpenAPI discovery.** Serve the existing OpenAPI document at `GET /.well-known/openapi.json` (the same handler as `/api/v1/openapi.json`, not a copy). Also add a `Link: </api/v1/openapi.json>; rel="service-desc"` header (RFC 8631) to `/api/v1` responses.
-3. **Skills discovery.**
-   - Serve `GET /.well-known/skills/index.json`, which lists the available skills (`[{ name, description, url }]`), and `GET /.well-known/skills/linkly/SKILL.md`, a skill file for using Linkly over REST.
-   - **What `SKILL.md` covers:** frontmatter `name` and `description`, then how to authenticate (follow the `401` → metadata → OAuth with CIMD, or use a personal access token), where the OpenAPI document is, the common tasks and which endpoint does each, the rule to ask the user before any operation marked `x-destructive: true`, and links to the docs.
-   - **Generate it, don't hand-write it:** build it at request time from `scopes.ts`, the OpenAPI registry, and the docs slice, so it can't drift from the API.
-4. **Docs.** Add a "Discovery without MCP" section to `docs/ARCHITECTURE.md`. It explains the flow and how it differs from MCP: what the agent gets for free (OAuth, docs, the API spec) and what it doesn't (tool annotations clients act on, toolsets on the consent screen, the `confirmUrl` delete flow).
+New slice `src/discovery/`. It adds metadata and build output only: no new business logic and no new data.
+
+1. **`llms.txt` on the dashboard, generated at build time.**
+   - **Generator:** a pure function, `renderLlmsTxt({ serverUrl })` in `src/discovery/llmsTxt.ts`, built from the docs slice. It must not import `wasp/*`, like everything the unit tests import.
+   - **Build hook:** a Vite plugin in `vite.config.ts` serves `/llms.txt` from the dev server and emits it into the client build. It then runs in every `wasp start`, `wasp build`, and deploy, with no step to remember. It reads the API address from `REACT_APP_API_URL`, which Wasp's client build already requires. Links to the API are absolute. Links to dashboard pages are root-relative (`/settings/tokens`), because they're on the same site as the file.
+   - **Content, in the llmstxt.org format, in this order:**
+     1. What Linkly is, in one paragraph.
+     2. **MCP (recommended):** the `/mcp` URL. Login is OAuth in the browser, where the user picks what the agent may do. Deletions may return a confirmation link to share with the user.
+     3. **REST:** the base URL and the OpenAPI URL. OAuth clients follow the `401` to log in. Any other agent asks the user for a personal access token from `/settings/tokens`, with the scopes the task needs.
+     4. **Rules:** never ask the user for their Linkly password. Ask the user before any operation marked `x-destructive: true`.
+     5. Links to every doc (the prerendered pages from item 2).
+   - **Only what the OpenAPI document can't say:** which way to connect, the token fallback, and the rules. Endpoints, the scope each one needs, `x-destructive` flags, and the login details (CIMD, PKCE, `resource`) are already in the OpenAPI document, so `llms.txt` links to it instead of repeating them.
+   - **Why build time, not a server route:** every input is fixed per deploy, and the file then lives on the dashboard's own site with no proxy or rewrite. Only content that changes without a deploy would need a server route.
+
+2. **Real HTML where agents land.**
+   - **Prerender** the homepage (`route("HomeRoute", "/", page(HomePage), { prerender: true })`), the docs index, and every doc page (`prerender` on `DocRoute`, one path per slug in `src/docs/content.ts`). The prerendered homepage is the logged-out view.
+   - **Make those pages safe to prerender.** `DocsPage` reads `window.location.origin` while rendering (`src/docs/ui/DocsPage.tsx`), and there's no `window` at build time. Fall back to root-relative links when there's no `window`.
+   - **A visible "For AI agents" section on the homepage,** with the MCP URL and the `llms.txt` URL. Visible text survives whatever HTML-to-text conversion an agent's fetch tool does, and people can copy it.
+   - Add `<link rel="alternate" type="text/markdown" href="/llms.txt">` to `head` in `main.wasp.ts`. It's cheap, but don't rely on it.
+   - With the docs prerendered, the `resource_documentation` link in the protected-resource metadata (already `/docs/<slug>`) becomes readable too.
+
+3. **"Connect an AI agent" on the Connections page.** A card with copy buttons for the MCP URL and a ready prompt: "Read `<dashboard>/llms.txt` and connect to my Linkly account." A URL the user hands over is the most reliable signal, because nothing depends on the agent guessing. Build the URLs at runtime from `config.apiUrl` and `window.location.origin`.
+
+4. **Signals on the API server, for code rather than models.**
+   - Already built in M4, keep as is: `401` with `WWW-Authenticate: Bearer resource_metadata="..."` on `/api/v1`, and `/.well-known/oauth-protected-resource/api/v1`.
+   - Add a `Link: </api/v1/openapi.json>; rel="service-desc"` header (RFC 8631) to `/api/v1` responses. `service-desc` means "machine-readable API description", so it points at the OpenAPI document, never at `llms.txt`.
+   - Serve the OpenAPI document at `GET /.well-known/openapi.json` too, for agents that look there first: the same handler as `/api/v1/openapi.json`, not a copy.
+   - **No `SKILL.md`.** A skill only adds value over `llms.txt` when agents install it, and skill installers install from git repos, not from a `/.well-known` URL. An installable skill for the `linkly` CLI would be its own milestone.
+
+5. **Docs.** Add a "Discovery without MCP" section to `docs/ARCHITECTURE.md`. It covers:
+   - the path from the dashboard address to an API call;
+   - why `llms.txt` is built ahead of time and pages are prerendered (two sites, empty page shell);
+   - what an agent on REST misses compared with MCP (tool annotations that clients act on, tool descriptions written for the model);
+   - serving the dashboard and API from one domain in production (a reverse proxy) as the recommended setup, while `llms.txt` works either way.
 
 *Accept:*
-- **An end-to-end test (`e2e/discovery.spec.ts`) acts as an agent with only `fetch`, plus Playwright for the consent click:**
-  1. `GET /api/v1/links` without a token → `401` with the `WWW-Authenticate` header.
-  2. Follow the header to the protected-resource metadata, then to the authorization-server metadata.
-  3. Complete OAuth with the CIMD test client fixture from M4, using `resource=${serverUrl}/api/v1`.
-  4. Fetch `/.well-known/openapi.json`, pick the list-links operation out of it, and call it successfully.
-  5. Fetch `/.well-known/skills/index.json` and the `SKILL.md` it points to.
+- **An end-to-end test (`e2e/discovery.spec.ts`) acts as an agent that's only given the dashboard address. It uses `fetch`, plus Playwright for the consent click:**
+  1. `GET <dashboard>/` without running JavaScript: the HTML contains the "For AI agents" text and the `llms.txt` URL.
+  2. `GET <dashboard>/llms.txt`, and read the MCP URL and the OpenAPI URL from it.
+  3. Fetch the OpenAPI document and pick the list-links operation out of it.
+  4. Call it without a token: `401` with the `WWW-Authenticate` header. Follow it to the protected-resource metadata, then to the authorization-server metadata.
+  5. Complete OAuth with the CIMD test client fixture from M4, using `resource=<server>/api/v1`, then call list-links successfully.
 
-  The test asserts that no request touched `/mcp`.
-- A unit test checks that `SKILL.md` mentions every operation that has `x-destructive: true`.
-- The OpenAPI document served at `/.well-known/openapi.json` still passes validation.
+  The test asserts that no request touched `/mcp`. If `wasp start` doesn't prerender (only `wasp build` does), check step 1 against a built client instead, and note how in `NOTES.md`.
+- **Unit test:** `llms.txt` contains the MCP URL, the OpenAPI URL, every doc slug, the token page, and both rules.
+- **Build check:** a client build with a given `REACT_APP_API_URL` outputs an `llms.txt` containing that address, and prerendered HTML for `/` and every doc page that contains the page's text.
+- The OpenAPI document served at `/.well-known/openapi.json` still passes validation, and `/api/v1` responses carry the `service-desc` header.
 
 **M11: Dynamic Client Registration fallback.** Supports older MCP clients that don't know CIMD and expect to register first (RFC 7591).
 
@@ -900,6 +927,45 @@ New slice `src/discovery/`. It adds metadata only: no new business logic and no 
 *Accept:*
 - Unit tests cover registration validation (reject a non-HTTPS, non-loopback redirect, reject an empty `redirect_uris`), the `404` when disabled, and the metadata including `registration_endpoint` only when enabled.
 - The end-to-end OAuth test runs once more with a DCR-registered client instead of the CIMD fixture, and passes.
+
+**M12: Confirm deletions with URL-mode elicitation.** Moves the MCP server to the 2026-07-28 revision, so a client that supports URL-mode elicitation opens the confirmation page itself instead of the agent passing the link along. The page, the pending deletion, and the rule that only the user can confirm, in their own dashboard session, stay as built in M7. Every other client, and REST, keeps getting `confirmUrl` in the result.
+
+> **Check the SDK first.** `@modelcontextprotocol/sdk` 1.x speaks 2025-11-25. The v2 packages (`@modelcontextprotocol/server`, `@modelcontextprotocol/client`) implement 2026-07-28. The names below are from v2.2: `createMcpHandler`, `inputRequired`, `inputRequired.elicitUrl`, `inputResponse`, and `createRequestStateCodec`. Where the current SDK docs differ, the docs win. Note the deviation in `NOTES.md`.
+
+> **Why URL mode, not form mode.** A "yes" from a form comes back through the client app, which could send it without asking the user. URL mode keeps the confirmation on Linkly's own page, behind the user's login: the same guarantee as the link today. That page already meets the spec's rules for URL mode. The URL isn't pre-authenticated, and only the user who started the request can confirm, because the page requires a session and finds only the session user's own actions. Keep it that way.
+
+1. **Upgrade the SDK.**
+   - Migrate `src/mcp` to the v2 packages, following the SDK's v1-to-v2 migration guide. Tools, scopes, toolsets, and result shapes stay the same.
+   - Serve `/mcp` with `createMcpHandler(buildServer)`, still with a fresh server per request.
+   - Keep its default `legacy: "stateless"`, so clients still on 2025-11-25 keep working with no sessions.
+   - Set `inputRequired.legacyShim: false`. The shim serves older clients by pushing requests over a session, and a stateless server has none, so a mistake should fail loudly instead.
+2. **Keep the service as it is.** `requestDeletion` still decides how a deletion happens and never imports the SDK. The MCP part goes in `src/mcp/confirmations.ts`. The registry wrapper uses it for any tool that returns `status: "confirmation_required"`, which today is only `delete_link`.
+3. **The first call.** A tool returns `confirmation_required`, and the request declares `elicitation.url` in `_meta["io.modelcontextprotocol/clientCapabilities"]`. Instead of the result, return `inputRequired` with:
+   - one request: `confirm: inputRequired.elicitUrl({ url: confirmUrl, message: "Confirm deleting <slug> in Linkly." })`;
+   - a `requestState` minted with `createRequestStateCodec`. It holds `{ actionId }`, it's bound to the grant ID and the tool name, and its `ttlSeconds` matches the pending deletion's `PENDING_TTL_MS`.
+
+   Check the capability on every request, never once per client: in this revision it travels with each request. A request without it, or one that declares only form mode, gets the result with `confirmUrl`, as today.
+4. **The retry.** Pass the codec's `verify` as `ServerOptions.requestState.verify`: state that's been tampered with, has expired, or belongs to another grant then gets the SDK's `-32602` error before the handler runs. Then read the answer with `inputResponse(ctx.mcpReq.inputResponses, "confirm")`:
+   - **Accept** only means the user agreed to open the page. Look up the pending deletion with a new service function, `getDeletionStatus(p, { actionId })`. It's for the action's owner and needs no session. Then:
+     - **Confirmed:** return `{ status: "deleted", id, slug }`.
+     - **Still pending:** return `inputRequired` again, with the same URL and a newly minted state. Don't hold the request open while waiting for the user.
+     - **Cancelled on the page, or expired:** return a new status, `not_deleted`, with a `message` that says why.
+   - **Decline:** withdraw the pending deletion so its link can't be used later, and return `not_deleted`. Add `withdrawPendingAction(p, { actionId })` for the action's owner. Withdrawing never deletes anything, so it needs no session.
+   - **Cancel** (the user dismissed the prompt): return `confirmation_required` with the `confirmUrl`, so the agent can still share the link.
+5. **Output and descriptions.** Add `not_deleted` to `DeleteToolOutput`. In `delete_link`'s description and the server instructions, say that in clients that support it the confirmation page opens by itself and the call finishes once the user confirms, and that otherwise the agent should share `confirmUrl`. REST doesn't change: it still returns `202` with `confirmUrl`.
+6. **Config.** Add `MCP_REQUEST_STATE_KEY` (at least 32 bytes) to `.env.server.example`. Every server instance needs the same key, because any instance may get the retry. Fail at startup if it's missing or too short.
+7. **Docs.**
+   - Update "Why the MCP server is stateless" in `docs/ARCHITECTURE.md`: Linkly now uses URL-mode elicitation where clients support it, with `confirmUrl` as the fallback.
+   - Replace the "Linkly hasn't made this upgrade yet" paragraph in Step 7 of `docs/GUIDE.md` with how Linkly does it now.
+
+*Accept:*
+- **Unit tests** in `src/mcp/`, with an in-memory v2 `Client`:
+  - A client that declares `elicitation.url` gets `input_required` with the `/confirm/:actionId` URL, and nothing is deleted.
+  - A client with no elicitation capability, and one with form mode only, get `confirmation_required` with `confirmUrl`.
+  - On the retry, a confirmed deletion returns `deleted`, a pending one returns `input_required` again, an expired one returns `not_deleted`, and a declined one returns `not_deleted` and shows as cancelled on the confirm page.
+  - State that's been tampered with, state from another grant, and expired state are rejected, and nothing is deleted.
+- **End-to-end test:** a v2 `Client` that declares `elicitation: { url: {} }`, using an OAuth grant with confirmation on. Its `elicitation/create` handler opens the URL in the Playwright page, where the logged-in user clicks Confirm, then returns `accept`. `delete_link` returns `deleted`, and the link is gone.
+- **Older clients still work.** Keep one test that speaks 2025-11-25 and assert it still gets `confirmUrl`. Use the v1 `Client`, or raw JSON-RPC over `fetch` if the two SDKs can't be installed side by side. The existing REST delete tests pass unchanged.
 
 ---
 
@@ -950,10 +1016,10 @@ Wasp only runs client tests (`wasp test client`) and doesn't support server-side
     5. **Features that exist only on MCP here:** toolsets the user picks on the consent screen, the `confirmUrl` delete flow, error text written for agents, and docs as resources.
 
     Close with the tradeoff: for developers and coding agents with a shell, REST plus the CLI is enough. MCP pays off when non-developers use the product through an AI assistant in a chat app.
-  - **"Why the MCP server is stateless":** a stateless server scales horizontally with no session affinity, but it can't send server-to-client requests. That rules out elicitation (asking the user mid-call) and push notifications. Linkly uses the portable alternative, a `confirmUrl` in the tool result that works in every client. Explain what would have to change to add elicitation: a stateful transport with session routing, plus a check of the client's declared capabilities with `confirmUrl` as the fallback.
+  - **"Why the MCP server is stateless":** a stateless server scales horizontally with no session affinity. Under the 2025-11-25 revision it can't send server-to-client requests, which rules out elicitation (asking the user mid-call) and push notifications, so Linkly uses the portable alternative: a `confirmUrl` in the tool result that works in every client. Explain that the 2026-07-28 revision makes the protocol stateless (the server returns the question and the client retries the call), so adding elicitation would take an SDK that speaks that revision, a check of the client's declared capabilities, a signed `requestState`, and `confirmUrl` as the fallback. Optional M12 builds this.
 
 ---
 
 ## 13. Explicitly out of scope
 
-Do not add: codemode or code-execution tools, a "load more tools" meta-tool, client allowlists, stateful MCP sessions, MCP Apps, elicitation, server-pushed notifications, websockets, OAuth in the CLI, interactive CLI prompts, teams, or billing. If something seems necessary that isn't in this spec, write it in `NOTES.md` as a proposal instead of building it.
+Do not add: codemode or code-execution tools, a "load more tools" meta-tool, client allowlists, stateful MCP sessions, MCP Apps, elicitation beyond M12, server-pushed notifications, websockets, OAuth in the CLI, interactive CLI prompts, teams, or billing. If something seems necessary that isn't in this spec, write it in `NOTES.md` as a proposal instead of building it.
