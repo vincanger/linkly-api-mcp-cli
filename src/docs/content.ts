@@ -119,7 +119,7 @@ MCP clients can also narrow the tool list with \`?toolsets=links,analytics\` on 
     body: `Deleting a link removes it and its click history permanently.
 
 - **In the dashboard**, you confirm in a dialog.
-- **Connected apps (OAuth)** follow your setting for that connection. With **Require confirmation** on (the default), the app gets a confirmation link instead of deleting: nothing happens until you open it and click **Confirm**. The link expires after 15 minutes.
+- **Connected apps (OAuth)** follow your setting for that connection. With **Require confirmation** on (the default), the app gets a confirmation link instead of deleting: nothing happens until you open it and click **Confirm**. Some AI apps open the page for you after asking; others share the link. The link expires after 15 minutes.
 - **Personal access tokens and the CLI** delete immediately (the CLI requires \`--yes\`).
 
 If you might want the link back, **archive** it instead: it stops redirecting but keeps its history.`,

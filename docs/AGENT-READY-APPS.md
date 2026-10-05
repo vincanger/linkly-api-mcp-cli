@@ -45,7 +45,7 @@ Two common mistakes make MCP servers hard to use: shipping dozens of tools, and 
 - `get_dashboard_url` takes a `view` that covers 7 pages, instead of one tool per page ([`deeplinks/mcp.ts`](../src/deeplinks/mcp.ts)).
 - `get_link_stats` takes `groupBy: day | referrer` instead of a separate referrers tool ([`analytics/mcp.ts`](../src/analytics/mcp.ts)).
 - `update_link` covers archiving, renaming, and retagging. `get_link` accepts an ID or a slug.
-- `delete_link` either deletes or returns a confirmation link, so there's no separate "request deletion" tool.
+- `delete_link` either deletes or asks the user to confirm, so there's no separate "request deletion" tool.
 
 **Don't merge tools across a permission or risk boundary.** A single `manage_link(action=...)` would mean fewer tools, but annotations (`readOnlyHint`, `destructiveHint`) and scope checks apply to whole tools. Merge reads with writes and clients can't tell which calls are safe, and a read-only connection can't hide the write tools. Split tools where the permission or risk changes, and use parameters everywhere else.
 
@@ -75,7 +75,7 @@ Random tokens with a recognizable prefix (`lk_pat_…`). Only the SHA-256 hash i
 
 The concepts, step by step: [OAUTH-FOR-AGENTS.md](OAUTH-FOR-AGENTS.md).
 
-**Safety for agents.** Mark destructive tools with `destructiveHint`, and have deletes from OAuth connections return a URL the human opens to confirm ([`requestDeletion`](../src/links/service.ts)). This works in every client, unlike elicitation.
+**Safety for agents.** Mark destructive tools with `destructiveHint`, and have deletes from OAuth connections return a URL the human opens to confirm ([`requestDeletion`](../src/links/service.ts)). The link works in every client. Clients that support URL-mode elicitation (MCP 2026-07-28) open the same page themselves and get the outcome back ([`confirmations.ts`](../src/mcp/confirmations.ts)).
 
 ## Fastest path
 

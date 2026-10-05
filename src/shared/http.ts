@@ -18,7 +18,7 @@ export const permissiveCors: RequestHandler = (req: Request, res: Response, next
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Authorization, Content-Type, Accept, Mcp-Protocol-Version, Mcp-Session-Id, Last-Event-ID",
+    "Authorization, Content-Type, Accept, Mcp-Protocol-Version, Mcp-Session-Id, Mcp-Method, Mcp-Name, Last-Event-ID",
   );
   res.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate, Mcp-Protocol-Version, Mcp-Session-Id, Link");
   res.setHeader("Access-Control-Max-Age", "86400");

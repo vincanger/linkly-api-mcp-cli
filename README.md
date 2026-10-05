@@ -25,7 +25,7 @@ Start at the top and go deeper as you need to:
 3. [`docs/OAUTH-FOR-AGENTS.md`](docs/OAUTH-FOR-AGENTS.md): how an MCP client logs in with no registration, for newcomers to OAuth.
 4. [`docs/AGENT-READY-APPS.md`](docs/AGENT-READY-APPS.md) covers when to use the options (API, CLI, MCP), auth, and the fastest path. It also includes notes on what Wasp can do to provide these in the future.
 
-For the build itself, [`SPEC.md`](SPEC.md) is the full spec. There still exist some optional implementation milestones.
+For the build itself, [`SPEC.md`](SPEC.md) is the full spec. Of its optional milestones, M12 (confirming deletions through URL-mode elicitation) is built; M10 (agent discovery) and M11 (Dynamic Client Registration) aren't yet.
 
 ## Run it
 
@@ -33,13 +33,15 @@ Requirements: Node 24+, [Wasp](https://wasp.sh) 0.25, Docker (for the dev databa
 
 ```bash
 npm install
-cp .env.server.example .env.server   # skips email verification locally
+cp .env.server.example .env.server   # dev settings: a dev MCP signing key
 wasp start db                         # Postgres in Docker; keep it running
 wasp db migrate-dev                   # in another terminal
 wasp start                            # client on :3000, server on :3001
 ```
 
 Sign up at http://localhost:3000. Emails (verification, password reset) are printed to the server console.
+
+Already have a `.env.server`? Copy `MCP_REQUEST_STATE_KEY` into it from the example: the server won't start without it.
 
 ## Connect an AI assistant (MCP)
 
@@ -50,6 +52,8 @@ claude mcp add --transport http linkly http://localhost:3001/mcp
 ```
 
 Your browser opens Linkly's consent screen. Log in, click Allow, and it's connected. Manage connected apps at `/settings/connections`.
+
+Deletions wait for your confirmation, unless you turn that off for the connection. Claude Code opens Linkly's confirmation page itself after asking you; other clients give you a link to open.
 
 Local clients (Claude Code, Cursor, VS Code) reach `localhost` directly. Web-hosted clients such as claude.ai need Linkly on a public HTTPS URL (for example through a tunnel), with `WASP_SERVER_URL` and `WASP_WEB_CLIENT_URL` set to the public URLs.
 

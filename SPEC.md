@@ -630,7 +630,7 @@ Dynamic Client Registration (RFC 7591) is not part of the core build. See option
 ### 6.1 Transport
 
 - Single Wasp `api` at `POST /mcp` (plus `GET` and `DELETE` returning `405`), `auth: false`, protected by `bearerAuth("mcp")` middleware.
-- **Stateless** Streamable HTTP: for each request, build a fresh `McpServer` for the request's principal and a `StreamableHTTPServerTransport` with no session ID generator, handle the request, then close both on response close. No in-memory sessions, so it scales horizontally and there's nothing to explain about session affinity.
+- **Stateless** Streamable HTTP (optional M12 moves this to the v2 SDK's `createMcpHandler`): for each request, build a fresh `McpServer` for the request's principal and a `StreamableHTTPServerTransport` with no session ID generator, handle the request, then close both on response close. No in-memory sessions, so it scales horizontally and there's nothing to explain about session affinity.
 - Server info: `{ name: "linkly", version: <package version> }`. Set `instructions` to a short paragraph: what Linkly is, "use `search_docs` when unsure," "use `get_dashboard_url` to show the user charts," and "deletions may return a confirmation link you should share."
 
 ### 6.2 `defineTool`
@@ -930,13 +930,14 @@ New slice `src/discovery/`. It adds metadata and build output only: no new busin
 
 **M12: Confirm deletions with URL-mode elicitation.** Moves the MCP server to the 2026-07-28 revision, so a client that supports URL-mode elicitation opens the confirmation page itself instead of the agent passing the link along. The page, the pending deletion, and the rule that only the user can confirm, in their own dashboard session, stay as built in M7. Every other client, and REST, keeps getting `confirmUrl` in the result.
 
-> **Check the SDK first.** `@modelcontextprotocol/sdk` 1.x speaks 2025-11-25. The v2 packages (`@modelcontextprotocol/server`, `@modelcontextprotocol/client`) implement 2026-07-28. The names below are from v2.2: `createMcpHandler`, `inputRequired`, `inputRequired.elicitUrl`, `inputResponse`, and `createRequestStateCodec`. Where the current SDK docs differ, the docs win. Note the deviation in `NOTES.md`.
+> **Check the SDK first.** `@modelcontextprotocol/sdk` 1.x speaks 2025-11-25. The v2 packages (`@modelcontextprotocol/server`, `@modelcontextprotocol/client`) implement 2026-07-28. Linkly is built on v2.1: `createMcpHandler`, `inputRequired`, `inputRequired.elicitUrl`, `inputResponse`, and `createRequestStateCodec`. Where the current SDK docs differ, the docs win.
 
 > **Why URL mode, not form mode.** A "yes" from a form comes back through the client app, which could send it without asking the user. URL mode keeps the confirmation on Linkly's own page, behind the user's login: the same guarantee as the link today. That page already meets the spec's rules for URL mode. The URL isn't pre-authenticated, and only the user who started the request can confirm, because the page requires a session and finds only the session user's own actions. Keep it that way.
 
 1. **Upgrade the SDK.**
    - Migrate `src/mcp` to the v2 packages, following the SDK's v1-to-v2 migration guide. Tools, scopes, toolsets, and result shapes stay the same.
-   - Serve `/mcp` with `createMcpHandler(buildServer)`, still with a fresh server per request.
+   - Serve `/mcp` with `createMcpHandler`, still with a fresh server per request. Wasp hands `handler.ts` an Express request, so it converts it to a web `Request` and calls `handler.fetch` itself, passing the principal as `authInfo.extra`. (The `@modelcontextprotocol/node` adapter would do the same, but needs Hono as a peer dependency.)
+   - Expect one behavior change: calling a tool the grant doesn't have is now a protocol error (`-32602`), not a tool result with `isError`, as the 2026-07-28 spec requires.
    - Keep its default `legacy: "stateless"`, so clients still on 2025-11-25 keep working with no sessions.
    - Set `inputRequired.legacyShim: false`. The shim serves older clients by pushing requests over a session, and a stateless server has none, so a mistake should fail loudly instead.
 2. **Keep the service as it is.** `requestDeletion` still decides how a deletion happens and never imports the SDK. The MCP part goes in `src/mcp/confirmations.ts`. The registry wrapper uses it for any tool that returns `status: "confirmation_required"`, which today is only `delete_link`.
@@ -947,8 +948,8 @@ New slice `src/discovery/`. It adds metadata and build output only: no new busin
    Check the capability on every request, never once per client: in this revision it travels with each request. A request without it, or one that declares only form mode, gets the result with `confirmUrl`, as today.
 4. **The retry.** Pass the codec's `verify` as `ServerOptions.requestState.verify`: state that's been tampered with, has expired, or belongs to another grant then gets the SDK's `-32602` error before the handler runs. Then read the answer with `inputResponse(ctx.mcpReq.inputResponses, "confirm")`:
    - **Accept** only means the user agreed to open the page. Look up the pending deletion with a new service function, `getDeletionStatus(p, { actionId })`. It's for the action's owner and needs no session. Then:
-     - **Confirmed:** return `{ status: "deleted", id, slug }`.
-     - **Still pending:** return `inputRequired` again, with the same URL and a newly minted state. Don't hold the request open while waiting for the user.
+     - **Confirmed:** return `{ status: "deleted", id, slug, actionId, message }`, with a `message` saying the user confirmed. The agent never sees the confirm page, so without it the result looks the same as an immediate delete.
+     - **Still pending:** clients retry as soon as the page opens, usually before the user has confirmed, so don't ask again. Poll the pending deletion for up to 20 seconds, then return `inputRequired` with only a newly minted state: the client retries without prompting (after 250 ms in the SDKs). The state counts these waits. After 8 (about 2.5 minutes, inside the SDKs' cap of 10 rounds per call), return `confirmation_required` with the link.
      - **Cancelled on the page, or expired:** return a new status, `not_deleted`, with a `message` that says why.
    - **Decline:** withdraw the pending deletion so its link can't be used later, and return `not_deleted`. Add `withdrawPendingAction(p, { actionId })` for the action's owner. Withdrawing never deletes anything, so it needs no session.
    - **Cancel** (the user dismissed the prompt): return `confirmation_required` with the `confirmUrl`, so the agent can still share the link.
@@ -964,8 +965,8 @@ New slice `src/discovery/`. It adds metadata and build output only: no new busin
   - A client with no elicitation capability, and one with form mode only, get `confirmation_required` with `confirmUrl`.
   - On the retry, a confirmed deletion returns `deleted`, a pending one returns `input_required` again, an expired one returns `not_deleted`, and a declined one returns `not_deleted` and shows as cancelled on the confirm page.
   - State that's been tampered with, state from another grant, and expired state are rejected, and nothing is deleted.
-- **End-to-end test:** a v2 `Client` that declares `elicitation: { url: {} }`, using an OAuth grant with confirmation on. Its `elicitation/create` handler opens the URL in the Playwright page, where the logged-in user clicks Confirm, then returns `accept`. `delete_link` returns `deleted`, and the link is gone.
-- **Older clients still work.** Keep one test that speaks 2025-11-25 and assert it still gets `confirmUrl`. Use the v1 `Client`, or raw JSON-RPC over `fetch` if the two SDKs can't be installed side by side. The existing REST delete tests pass unchanged.
+- **End-to-end test:** a v2 `Client` that declares `elicitation: { url: {} }`, using an OAuth grant with confirmation on. Its `elicitation/create` handler starts opening the URL in the Playwright page and returns `accept` at once, like a real client. The logged-in user clicks Confirm while the server waits on the retry. `delete_link` returns `deleted`, and the link is gone. A second test declines, and the confirm page then shows the request as cancelled.
+- **Older clients still work.** The existing end-to-end tests keep the v1 `Client` (a dev dependency), so they run as 2025-11-25 clients and still get `confirmUrl`. The existing REST delete tests pass unchanged.
 
 ---
 

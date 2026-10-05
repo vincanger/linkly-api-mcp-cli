@@ -20,7 +20,7 @@ const pat = (scopes: string[] = ["links:read", "links:write", "analytics:read"])
   principalFromPat({ userId, scopes: scopes as never });
 
 async function connect(p: Principal, toolsets?: ("links" | "analytics")[]) {
-  conn = await connectInProcess(p, toolsets);
+  conn = await connectInProcess(p, { toolsets });
   return conn;
 }
 
@@ -29,6 +29,19 @@ describe("MCP server", () => {
     const { client } = await connect(pat());
     expect(client.getServerVersion()).toMatchObject({ name: "linkly" });
     expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
+  });
+
+  it("speaks 2026-07-28, and still serves 2025-era clients", async () => {
+    const { client } = await connect(pat());
+    expect(client.getProtocolEra()).toBe("modern");
+    const legacy = await connectInProcess(pat(), { era: "legacy" });
+    try {
+      expect(legacy.client.getProtocolEra()).toBe("legacy");
+      expect(legacy.client.getServerVersion()).toMatchObject({ name: "linkly" });
+      expect((await legacy.client.listTools()).tools.map((t) => t.name)).toContain("delete_link");
+    } finally {
+      await legacy.close();
+    }
   });
 
   it("lists tools with input and output schemas and annotations", async () => {
@@ -119,7 +132,7 @@ describe("MCP server", () => {
 
   it("only lists tools the principal's scopes allow, and ?toolsets= only narrows", async () => {
     const names = async (p: Principal, t?: ("links" | "analytics")[]) => {
-      const c = await connectInProcess(p, t);
+      const c = await connectInProcess(p, { toolsets: t });
       const { tools } = await c.client.listTools();
       await c.close();
       return tools.map((x) => x.name).sort();

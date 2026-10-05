@@ -9,11 +9,11 @@ It works for any stack. The code sketches are TypeScript, but nothing depends on
 1. Put your logic in operations that any surface can call.
 2. Describe every operation for agents: what it does, its inputs and outputs, the permission it needs, and whether it reads, writes, or destroys.
 3. Define permissions once, and check them inside the operation.
-<!-- TODO (AGENT): why do we say PAT here. Couldn't we go straight to oauth?  -->
 4. Ship a REST API with personal access tokens and a generated OpenAPI document.
 5. Add an MCP server over the same operations. Start with token auth.
 6. Let people connect with OAuth, and let them choose each permission.
 7. Make destructive actions wait for the human.
+<!-- TODO (AGENT): should we consider making a CLI even less important, e.g. moving to number 9 or 10? -->
 8. Add a CLI, if your users have shells.
 9. Help agents find you from your domain alone.
 10. Add tests that keep the surfaces in sync.
@@ -43,21 +43,37 @@ Build your app in two layers:
 
 Most of the work, and most of the value, is in the first layer. If your operations are well defined, with clear descriptions, schemas, and permissions, each surface is a short adapter. If they aren't, every surface re-implements the rules, and they drift apart.
 
+<!-- TODO (AGENT): this entire section below is taken from Rhys's https://x.com/RhysSullivan/status/2070630745891365008 we need to rewrite this section and give credit in the original article -->
 ## Which surfaces do you need?
 
-It depends on where your users' agents run.
+### MCP
+MCP seems to be the right protocol to use for any interactions that are with agents, some examples of this are:
+Claude Channels is built on MCP and allows you to push data back into a running session via an MCP
+MCP Apps allows for embedding ui directly inside of chats, i.e "show me a chart of my posthog data"
+MCP Elicitation enables getting actual input from humans, this is really useful when you need them to confirm something like "are you okay with analytics" or going to a url to perform an action
+MCP Triggers to notify clients of state changes
+now the trouble with these is there's a chicken and egg problem. most clients only implement support for MCP tools and that's it. what's cool though is you can actually work around partial client support but doing the same functionality over tool calls only as a fallback, which i'll have a longer post coming on
 
-| Where the agent runs | Examples | What it can use | Build |
-|---|---|---|---|
-| A terminal, with a shell | Claude Code, Cursor, Codex | HTTP, any CLI | REST API and tokens, then a CLI |
-| A chat or mobile app | Claude, ChatGPT | MCP servers the user adds by URL | An MCP server with OAuth |
-| Your users' own code | Scripts, integrations, other services | HTTP | REST API and tokens |
-| Anywhere, knowing only your domain | "Use myapp.com" | Whatever it can discover | `llms.txt` pointing at the above |
+### APIs
+where i'm landing on APIs is they're great for raw data access and quickly converting your app to be agent accessible. APIs carry good information already about their descriptions, what operations are destructive / not destructive / etc
+to me, it doesn't make sense to try to get behavior like mcp apps, elicitation, triggers through OpenAPI as that's not meant to be for agents, mcp is
 
-Rules of thumb:
+### CLI
+this is going to be controversial, but i really think that CLIs are just for humans when looking at the long term horizon. a bit part of this comes down to the known action space of a CLI, in that for people that want to know what an agent is actually able to do
+the other part about CLIs is requiring a unix shell to run them. when we look at enabling every person in the world to have a personal assistant or interact with their data through ai, the overhead of CLIs very quickly makes this not possible
+that's not to say that they're bad though, i would easily argue the CLIs produced by @steipete are state of the art for agents because of how much care has been put into the design of their interfaces, their ability to get data in hard to reach places, etc
+today CLIs provide the best debuggability, interfacing, data access, etc to agents because of the beautiful composability of bash and everything running them locally on your computer enables
+back in March we saw a lot of writing around 'Building CLIs for agents' and fundamentally it just comes down to bash being the wrong primitive for agents to be using. there's too many footguns for them to get trapped in i.e when they run a command that prompts for human input
 
+### closing
+at the end of the day, you can convert an API into an MCP into a CLI back into an MCP back into an API
+they're all the same concept, giving the agent the ability to invoke tools, what changes is the amount of dependencies and capabilities the agent gets when using it
+APIs are probably fine for 90% of applications, CLIs are the best for agents today just due to the robustness of bash, MCP has a lot of potential to solve the problems presented by using CLIs today, however, it's going to require spec improvements and good harness implementations so hopefully fable comes back
+
+
+<!-- TODO (AGENT): i think we could update these -->
 - **Everyone needs a REST API.** It's the baseline every other surface can build on, and a CLI or an MCP server can sit on top of it.
-- **Add MCP when non-developers will use your app through a chat assistant.** It's the standard way those apps connect to other services: the user adds one URL and clicks Allow. The alternatives are off by default, work in only one client, or make the user handle tokens.
+- **Add MCP when non-developers will use your app through a chat assistant.** It's the standard way those apps connect to other services: the user adds one URL and clicks Allow. The alternatives are off by default, work in only one client, or make the user handle tokens. The full list of benefits and limits is in [The case for MCP](#the-case-for-mcp).
 - **A CLI is nearly free** once you have an OpenAPI document, and it's what coding agents reach for first.
 
 If all your users are developers, REST plus a CLI is enough, and you can skip MCP.
@@ -205,11 +221,11 @@ Either way, **the permission and the effect must never differ between surfaces.*
 
 | Feature | Fallback that works in every client | In Linkly |
 |---|---|---|
-| Ask the user to confirm something | Return a URL the user opens to confirm (Step 7) | `confirmUrl` on deletes |
+| Ask the user to confirm something | Return a URL the user opens to confirm (Step 7) | `confirmUrl` on deletes, and URL-mode elicitation where clients support it |
 | Show a chart or a form in the chat | Return a link to that view in your app | `dashboardUrl` in results, and `get_dashboard_url` |
 | Tell the client that something changed | Reflect the change on the next request | The tool list is rebuilt from the grant on every request |
 
-**Why:** MCP is how chat apps reach your product. For plain tools, it adds no abilities the REST API lacks: its value is in how the agent connects, discovers the tools, and learns which ones are safe, plus the interaction features above. Compared with a CLI, every MCP server also logs in the same way (the OAuth flow in Step 6), where each CLI invents its own login. And clients can index and search a server's tool catalog, where a CLI's `--help` is free text.
+**Why:** MCP is how chat apps reach your product. For plain tools, it adds no abilities the REST API lacks: its value is in how the agent connects, discovers the tools, and learns which ones are safe, plus the interaction features above. Compared with a CLI, every MCP server also logs in the same way (the OAuth flow in Step 6), where each CLI invents its own login. And clients can index and search a server's tool catalog, where a CLI's `--help` is free text. The full list is in [The case for MCP](#the-case-for-mcp).
 
 **Done when:**
 
@@ -273,7 +289,7 @@ For destructive actions, use URL mode. It's your confirmation link, opened by th
          "params": {
            "mode": "url",
            "url": "https://linkly.example.com/confirm/pa_123",
-           "message": "Confirm deleting summer-sale in Linkly."
+           "message": "Confirm deleting the link \"summer-sale\" in Linkly."
          }
        }
      },
@@ -282,18 +298,19 @@ For destructive actions, use URL mode. It's your confirmation link, opened by th
    ```
 
 2. The client shows the URL, the user agrees, and the page opens. The user confirms there.
-3. The client retries `delete_link` with the answer, `"inputResponses": { "confirm": { "action": "accept" } }`, and the same `requestState`. "Accept" only means the user agreed to open the page, so the server checks its own record: if the deletion was confirmed, it returns the final result; if not, it returns `input_required` again. If the user declines, return a normal result saying nothing was deleted.
+3. The client retries `delete_link` with the answer, `"inputResponses": { "confirm": { "action": "accept" } }`, and the same `requestState`. "Accept" only means the user agreed to open the page, so the server checks its own record: if the deletion was confirmed, it returns the final result. If the user declines, it withdraws the pending deletion and returns a normal result saying nothing was deleted.
+4. Clients retry as soon as the page opens, usually before the user has confirmed. Don't ask again: wait briefly (Linkly checks for up to 20 seconds), then return `input_required` with only the `requestState`, and the client retries without prompting. Clients cap the rounds of one call (10 in the official SDKs), so cap the waiting too and then return the link.
 
 Two rules:
 
 - **Check the client's capabilities on every request.** Send a URL-mode request only when the request declares support for it. Every other client gets the link in the tool result, as before.
 - **Treat `requestState` as input an attacker could have changed.** Sign it, bind it to the user and the pending deletion, give it an expiry, and keep the pending deletion single-use.
 
-Linkly hasn't made this upgrade yet: its SDK (`@modelcontextprotocol/sdk` 1.x) speaks the previous revision (2025-11-25), so every client gets the link in the tool result. Upgrading means moving to the v2 SDK, checking the capability, returning the same `/confirm/:actionId` URL as a URL-mode request, and returning the result on the retry. [SPEC.md](../SPEC.md)'s optional milestone M12 describes it.
+Linkly does this with the v2 MCP SDK, which speaks both 2026-07-28 and the older revisions from one endpoint. As of October 2026, few clients support it: the Claude Code CLI opens the page itself, Codex and OpenCode can with opt-in settings, and the chat apps (ChatGPT, Claude Desktop, claude.ai) don't yet. They get the link, so build the link first.
 
 **Done when:** an agent's delete returns a link, and nothing is deleted until you open it and confirm. If you've made the upgrade, a client that supports URL-mode elicitation opens that same page itself, and its retry returns the result.
 
-**In Linkly:** [`requestDeletion`](../src/links/service.ts), [`src/deeplinks/`](../src/deeplinks/).
+**In Linkly:** [`requestDeletion`](../src/links/service.ts), [`src/deeplinks/`](../src/deeplinks/), [`src/mcp/confirmations.ts`](../src/mcp/confirmations.ts).
 
 <!-- TODO (AGENT): check the claim here i think some desktop apps have shells, but then they need a sandbox, right? helpe me here. -->
 ## Step 8: Add a CLI, if your users have shells
@@ -382,13 +399,67 @@ If you generate your surfaces from one declaration, most of this comes for free.
 - **Deleting on a single call from an agent.** Make it wait for the human.
 - **Docs that only render with JavaScript.** Agents see an empty page.
 
-## Status, as of September 2026
+## The case for MCP
+
+Every surface can call the same tools: turn an MCP server into a CLI, and the tools don't change. So MCP's value isn't in what the tools can do. It's in how agents connect, who holds the credentials, what the client shows the user, and a few features the other surfaces have no equivalent for. Here's the full list, with the limits of each.
+
+### Reach and setup
+
+- **It works where there's no shell.** MCP is how chat, desktop, web, and mobile assistants connect to other services. Their alternatives are off by default, work in only one client, or make the user handle tokens.
+- **A remote server needs nothing on the user's machine:** no install, no runtime, no sandbox. (A local MCP server needs a runtime, like a CLI does.)
+- **Setup is pasting one URL.** The client finds the login from a `401`, needs no registration, and the user clicks Allow (Step 6). That replaces "create a token and explain the API to your agent."
+- **One server works in every client.** The same URL works in chat apps, IDEs, and coding agents, with nothing to set up per client.
+- **Every server logs in the same way.** A server that follows the spec uses the same OAuth flow as every other, while each CLI invents its own login and config. This holds only if you follow the spec.
+- **Improvements reach everyone at once.** Fix a description or add a tool, and every connected agent gets it on its next connection. A CLI waits for users to upgrade.
+
+### Security and control
+
+- **The model never holds the token.** The client stores it, refreshes it, and attaches it only to requests to your server, so a prompt injection can't make the agent print it or send it somewhere else. A token in an environment variable stays out of the agent's context, but the agent can still use it anywhere.
+- **Clients act on safety hints.** They run read-only tools without asking and ask before destructive ones. OpenAPI has no standard flag for this (Step 4 adds one), and a CLI declares nothing.
+- **Approvals are readable.** "Allow `delete_link` with `id: summer-sale`?" is easier to judge than a raw `curl` command, and users can always allow just the read-only tools.
+- **The set of actions is known.** A list of tools is easier to review and govern than a shell that can run anything. It's also why you can turn an MCP server into a CLI, but not a CLI into an MCP server.
+- **The tool list follows the user's choices.** With a separate checkbox for each permission (Step 6), tools the user didn't grant disappear from the list. REST can enforce the same permissions, but it has no list to shrink.
+- **Organizations can govern it.** Admins can allow or block connectors centrally in chat products, and your server sees every call, per connection.
+
+### Agent ergonomics
+
+- **Tools describe themselves.** On connect, the client gets every tool's name, description, and schemas, plus the server's instructions, with nothing to configure.
+- **Arguments are checked against a schema.** The model fills in structured arguments instead of composing a method, path, headers, and body, which fails less often outside strong coding agents.
+- **Clients can index and search the catalog.** A structured tool list is what tool search and lazy loading are built on, where a CLI's `--help` is free text. (An OpenAPI document is just as searchable, and this only helps in clients that search.)
+- **Code mode builds on it.** Harnesses that run tools from code turn your tools and output schemas into typed functions. The model writes one loop, only the result comes back into its context, and the token stays with the harness (Step 8).
+- **No shell pitfalls.** Nothing hangs waiting for interactive input, and there's no quoting or escaping to get wrong.
+- **Docs can be resources.** The server can expose its docs for the client to browse and attach, alongside a docs-search tool (Step 5).
+
+### Features the other surfaces don't have
+
+- **Elicitation:** asking the user something mid-call. URL mode opens a page of yours, such as a confirmation page (Step 7).
+- **MCP Apps:** UI inside the chat, such as a chart or a form.
+- **Notifications:** telling the client that something changed, or pushing data into a running session.
+- **Skills over MCP:** instructions for using your server, shipped with it (still being worked on).
+
+Few clients support these yet (see [Status](#status-as-of-october-2026)), so give each one a fallback that works with tools alone (the table in Step 5).
+
+### Where MCP doesn't win
+
+- **Plain tools gain nothing over REST.** If your server only wraps endpoints, its value is the connection, login, and safety above, not new abilities. An OpenAPI document plus OAuth that accepts any client already serves most agents well.
+- **Developers with a shell need less.** REST plus a CLI covers them. CLIs compose with other tools and are easier to debug, because a person can re-run the exact command.
+- **Context cost depends on the client.** Clients that load every tool up front pay for each definition, used or not, which is one more reason to avoid near-duplicate tools.
+- **Bulk work is slow without code mode.** "Tag 500 links" becomes 500 calls, with every result passing through the model.
+- **It's still moving.** The spec changes, and clients support its newer features unevenly.
+
+### Claims that don't hold up
+
+- **"Only MCP supports multiple accounts."** Good CLIs have profiles too (`gh auth switch`, `aws --profile`).
+- **"Every client loads tools lazily now."** Some do and some don't, and you can't choose your users' client.
+- **"More tools is better," or "fewer is better."** Neither: cover every capability, with no near-duplicates (Step 5).
+
+## Status, as of October 2026
 
 The patterns above should hold for years. These details are still moving, so check the current specs:
 
 - **MCP authorization:** the MCP spec recommends Client ID Metadata Documents. Its 2026-07-28 revision deprecates Dynamic Client Registration, keeping it only for backwards compatibility. CIMD is still an IETF draft, and client support varies.
 - **The protocol became stateless** in the 2026-07-28 revision: no sessions and no `initialize` handshake, and elicitation works by returning the question and having the client retry the call. Clients and SDKs are still catching up.
-- **Elicitation, MCP Apps, and notifications** work in some clients and not others. The tool-only fallbacks in Step 5 work everywhere.
+- **Elicitation, MCP Apps, and notifications** work in some clients and not others. The tool-only fallbacks in Step 5 work everywhere. For URL-mode elicitation over 2026-07-28 (Step 7): the Claude Code CLI supports it, Codex and OpenCode only with opt-in settings, and ChatGPT, Claude Desktop, and claude.ai don't yet. ChatGPT supports form mode.
 - **Code mode** (running tools from code in a sandbox): the Claude API can do it for tools you define, but not for tools from MCP connectors. Agent frameworks such as Goose support it, and some servers, such as Cloudflare's, run it on the server side. As far as public docs show, chat apps such as ChatGPT and Claude offer lazy loading of tools at most. (Claude Desktop's "Code" mode is something else: Claude Code inside the app.)
 - **Skills over MCP:** ways to ship skills through an MCP server are being worked on. Check the current spec before relying on them.
 - **`llms.txt`** is a convention some agents check. OpenAPI discovery at `/.well-known` is a proposal, with no agreed path yet.

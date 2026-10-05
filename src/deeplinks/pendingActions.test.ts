@@ -3,7 +3,7 @@ import { createLink, requestDeletion } from "../links/service";
 import { DomainError } from "../shared/errors";
 import { principalFromGrant, principalFromSession, type Principal } from "../shared/principal";
 import { createTestUser, prisma, resetDb } from "../test/db";
-import { cancelPendingAction, confirmPendingAction, getPendingAction } from "./pendingActions";
+import { cancelPendingAction, confirmPendingAction, getDeletionStatus, getPendingAction, withdrawPendingAction } from "./pendingActions";
 
 let owner: Principal;
 let app: Principal;
@@ -64,6 +64,28 @@ describe("pending deletions", () => {
   it("can only be confirmed from a dashboard session", async () => {
     const { actionId } = await pendingDeletion();
     await expect(confirmPendingAction(app, { actionId }, { prisma }).catch(code)).resolves.toBe("forbidden");
+  });
+
+  it("lets the app that asked check its status, without a session", async () => {
+    const { actionId, confirmUrl } = await pendingDeletion();
+    expect(await getDeletionStatus(app, { actionId }, { prisma })).toMatchObject({ status: "pending", confirmUrl, link: { slug: "doomed" } });
+    await confirmPendingAction(owner, { actionId }, { prisma });
+    expect((await getDeletionStatus(app, { actionId }, { prisma })).status).toBe("completed");
+    const stranger = principalFromGrant({ id: "g2", userId: (await createTestUser()).id, clientName: "Other", scopes: ["links:write"], confirmDestructive: true });
+    await expect(getDeletionStatus(stranger, { actionId }, { prisma }).catch(code)).resolves.toBe("not_found");
+  });
+
+  it("lets the app withdraw a pending request, so its link can't be used", async () => {
+    const { actionId } = await pendingDeletion();
+    expect((await withdrawPendingAction(app, { actionId }, { prisma })).status).toBe("cancelled");
+    await expect(confirmPendingAction(owner, { actionId }, { prisma }).catch(code)).resolves.toBe("conflict");
+    expect(await prisma.link.count()).toBe(1);
+  });
+
+  it("leaves a confirmed request alone when withdrawn", async () => {
+    const { actionId } = await pendingDeletion();
+    await confirmPendingAction(owner, { actionId }, { prisma });
+    expect((await withdrawPendingAction(app, { actionId }, { prisma })).status).toBe("completed");
   });
 
   it("deletes immediately when the grant doesn't require confirmation", async () => {

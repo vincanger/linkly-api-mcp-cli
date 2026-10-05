@@ -54,10 +54,10 @@ Every feature is a service function; the dashboard and MCP are adapters over the
 |---|---|
 | Dashboard session | Deleted (the UI's own dialog is the confirmation) |
 | Personal access token (REST, MCP, CLI) | Deleted (the CLI requires `--yes`) |
-| OAuth connection with confirmation on | `confirmation_required` + `confirmUrl` (REST: `202`) |
+| OAuth connection with confirmation on | `confirmation_required` + `confirmUrl` (REST: `202`). MCP clients with URL-mode elicitation open the page themselves and get `deleted` or `not_deleted` |
 | OAuth connection with confirmation off | Deleted |
 
-A confirmation creates a [`PendingAction`](../src/deeplinks/pendingActions.ts) (15-minute expiry). The user opens [`/confirm/:actionId`](../src/deeplinks/ui/ConfirmActionPage.tsx), sees the link and which app asked, and confirms. Only the same user, in a dashboard session, before expiry, once. This works in every MCP client, because it's just a URL in a tool result.
+A confirmation creates a [`PendingAction`](../src/deeplinks/pendingActions.ts) (15-minute expiry). The user opens [`/confirm/:actionId`](../src/deeplinks/ui/ConfirmActionPage.tsx), sees the link and which app asked, and confirms. Only the same user, in a dashboard session, before expiry, once. The link works in every MCP client, because it's just a URL in a tool result. Clients that support URL-mode elicitation open the same page themselves ([details below](#why-the-mcp-server-is-stateless)).
 
 ### No codemode, no lazy loading
 
@@ -118,29 +118,26 @@ You'll notice Linkly's MCP tools map one to one to REST endpoints. That's delibe
 2. **Setup is pasting one URL.** The client discovers the login from a `401`, needs no registration, and the user clicks Allow ([How OAuth works here](#how-oauth-works-here)). That replaces "create a token and explain the API to your agent".
 3. **Tools describe themselves.** On connect, the client gets every tool's name, description, input and output schema, plus the server's instructions, with nothing to configure ([`src/mcp/defineTool.ts`](../src/mcp/defineTool.ts), [`src/mcp/server.ts`](../src/mcp/server.ts)).
 4. **Safety hints clients understand.** Clients act on `readOnlyHint` and `destructiveHint`: auto-running reads, asking before deletes. OpenAPI has no standard equivalent, which is why Linkly's `x-destructive` is a custom extension that most tools ignore.
-5. **Features that only exist on MCP here:** toolsets the user picks on the consent screen, the `confirmUrl` delete flow as a first-class tool result, error text written for agents (`Link "abc" not found. Use list_links to find valid IDs or slugs.`), and docs as resources.
+5. **Features that only exist on MCP here:** the tool list shrinks to what the user granted, clients can open the confirm page themselves (URL-mode elicitation), and docs are exposed as resources the client can browse and attach. REST shares the rest: the same consent screen and scopes, the confirmation link (as a `202`), and the same error text written for agents (`Link "abc" not found. Use list_links to find valid IDs or slugs.`).
 
 The tradeoff: for developers and coding agents with a shell, REST plus the CLI is enough; most apps could stop there. MCP pays off when **non-developers** use the product through an AI assistant in a chat app.
 
 ## Why the MCP server is stateless
 
-[`src/mcp/handler.ts`](../src/mcp/handler.ts) builds a fresh `McpServer` and a `StreamableHTTPServerTransport` with no session ID for every request, and closes both when the response ends. Any instance can serve any request: it scales horizontally with no session affinity and no in-memory state to explain.
+[`src/mcp/handler.ts`](../src/mcp/handler.ts) passes every request to one `createMcpHandler` from the MCP SDK (v2). It builds a fresh `McpServer` for the request's principal and discards it once the response is sent. Any instance can serve any request: it scales horizontally with no session affinity and no in-memory state to explain.
 
-**Under the protocol version Linkly speaks, that has a cost.** Linkly's MCP SDK (1.30) implements the 2025-11-25 revision, where a server asks the client for something by sending it a request mid-call and waiting for the reply on the same connection. A stateless server can't do that, which rules out two features:
+**One endpoint serves both protocol eras.** Clients on 2025-11-25 or earlier connect with `initialize`, and each of their requests is answered statelessly. Clients on 2026-07-28 skip the handshake: that revision makes the protocol itself stateless, and every request carries the client's capabilities.
 
-- **Elicitation** (the server asking the user a question mid-call, e.g. "Delete this link? Yes/No").
-- **Push notifications** (telling the client that something changed, e.g. the tool list after a grant is edited).
+**That's what makes elicitation possible here.** Under 2025-11-25, a server asks the user something by sending the client a request mid-call and waiting for the reply on the same connection, which a stateless server can't do. Under 2026-07-28, the server returns an `input_required` result instead, and the client retries the call with the answer. Linkly uses this for one thing: confirming deletions with URL-mode elicitation ([`src/mcp/confirmations.ts`](../src/mcp/confirmations.ts)).
 
-Linkly uses the portable alternative instead: the `confirmUrl` in the tool result. It works in every client, including the many that only support basic tools, and it moves the decision into the product, where the user sees exactly what will happen.
+- **The first call:** `delete_link` creates the pending deletion as before. If the request declares `elicitation.url`, the server returns the `/confirm/:actionId` page as a URL-mode request, with a signed `requestState`. The client shows the URL and opens it if the user agrees.
+- **The retry:** "accept" only means the page opened, so the server checks the pending deletion. Clients retry as soon as the page opens, so the server polls for up to 20 seconds, then returns `input_required` with only the state, and the client retries without asking the user again. The answer is `deleted`, or `not_deleted` if the user declined, cancelled on the page, or let it expire. After about 2.5 minutes the server stops waiting and returns the link.
+- **The signed state:** an HMAC with `MCP_REQUEST_STATE_KEY`, bound to the user and the grant, expiring with the pending deletion. The SDK rejects tampered, expired, or another grant's state before the tool runs. The pending deletion itself stays single-use.
+- **Every other client gets `confirmUrl`** in the tool result: 2025-era clients (a stateless server never sees their capabilities), clients without URL mode, and REST. As of October 2026 that includes most chat apps; the Claude Code CLI is the main client that opens the page itself.
 
-**The 2026-07-28 revision removes that cost.** It makes the protocol itself stateless: no sessions and no `initialize` handshake. A server that needs the user's input returns an `input_required` result with the question and a `requestState` blob, and the client retries the original call with the answer ("multi round-trip requests"). Change notifications get their own opt-in stream (`subscriptions/listen`). So adding elicitation to Linkly no longer means sessions or sticky routing. It would take:
+Either way, the user confirms on Linkly's own page, in their logged-in session. Elicitation changes how the link reaches the user, not who can confirm.
 
-1. An **SDK that speaks 2026-07-28**.
-2. A **capability check**: only ask when the request's declared client capabilities include elicitation.
-3. A **signed `requestState`**, bound to the user and the link and with an expiry, because the spec treats it as input an attacker could have changed.
-4. **`confirmUrl` as the fallback** for every client that doesn't support elicitation.
-
-Until then, `confirmUrl` covers every client, and the confirmation happens in the user's own logged-in session.
+**Push notifications** (telling the client that the tool list changed after a grant is edited) would use 2026-07-28's `subscriptions/listen` stream. Linkly doesn't need them: every request rebuilds the tool list from the grant.
 
 ## How OAuth works here
 
@@ -160,6 +157,6 @@ This section is the short, code-first version. New to OAuth for agents? Watch [H
 
 Wasp runs client tests only, so tests come in three kinds:
 
-- **Server unit tests** (`npm test`, [`vitest.config.ts`](../vitest.config.ts)): services, OAuth logic, the MCP registry and server (through the SDK's in-memory transport), parity and lint tests, against a real Postgres test database. This works because services never import Wasp.
-- **Live-server tests** (`npm run test:e2e`, [`playwright.config.ts`](../playwright.config.ts)): Playwright starts `wasp start` on the test database and runs browser flows, REST, the MCP SDK client over Streamable HTTP, the complete OAuth flow headless (a local [test client](../e2e/fixtures/testClient.ts) serves its CIMD document and catches the redirect), and the CLI as a subprocess.
+- **Server unit tests** (`npm test`, [`vitest.config.ts`](../vitest.config.ts)): services, OAuth logic, the MCP registry and server (a real SDK client calling the handler in process, over both protocol eras), parity and lint tests, against a real Postgres test database. This works because services never import Wasp.
+- **Live-server tests** (`npm run test:e2e`, [`playwright.config.ts`](../playwright.config.ts)): Playwright starts `wasp start` on the test database and runs browser flows, REST, MCP SDK clients over Streamable HTTP (v1 as a 2025-era client, v2 for 2026-07-28 and URL-mode elicitation), the complete OAuth flow headless (a local [test client](../e2e/fixtures/testClient.ts) serves its CIMD document and catches the redirect), and the CLI as a subprocess.
 - **Manual checks** that can't be automated, and their results, are listed in [`NOTES.md`](../NOTES.md#manual-checks-still-to-do).

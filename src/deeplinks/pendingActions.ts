@@ -88,24 +88,61 @@ export async function confirmPendingAction(
   const status = statusOf(action, now());
   if (status !== "pending") throw new DomainError("conflict", `This request is ${status} and can't be confirmed.`);
 
-  // Claim it first so a double click can't run it twice.
-  const claimed = await prisma.pendingAction.updateMany({
-    where: { id: action.id, completedAt: null, cancelledAt: null },
-    data: { completedAt: now() },
-  });
-  if (claimed.count === 0) throw new DomainError("conflict", "This request was already handled.");
-
+  // Claim and delete in one transaction: a double click can't run it twice,
+  // and nobody (including an app polling the status) sees it completed
+  // before the link is gone.
   const payload = action.payload as DeletionPayload;
-  try {
-    await deleteLink(p, { id: payload.linkId }, { prisma });
-  } catch (e) {
-    if (!(e instanceof DomainError && e.code === "not_found")) {
-      await prisma.pendingAction.update({ where: { id: action.id }, data: { completedAt: null } });
-      throw e;
+  const completed = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.pendingAction.updateMany({
+      where: { id: action.id, completedAt: null, cancelledAt: null },
+      data: { completedAt: now() },
+    });
+    if (claimed.count === 0) throw new DomainError("conflict", "This request was already handled.");
+    try {
+      // deleteLink only uses `link`, which the transaction client has.
+      await deleteLink(p, { id: payload.linkId }, { prisma: tx as unknown as PrismaClient });
+    } catch (e) {
+      if (!(e instanceof DomainError && e.code === "not_found")) throw e;
+      // Already deleted some other way: the user's intent is satisfied.
     }
-    // Already deleted some other way: the user's intent is satisfied.
+    return tx.pendingAction.findUniqueOrThrow({ where: { id: action.id } });
+  });
+  return toOut(completed, now());
+}
+
+/**
+ * For the app that asked: where its request stands, without the session the
+ * confirm page needs. Lets an MCP client that opened the confirm page itself
+ * (URL-mode elicitation) learn whether the user confirmed.
+ */
+export async function getDeletionStatus(
+  p: Principal,
+  input: { actionId: string },
+  { prisma, now = () => new Date() }: Deps,
+): Promise<PendingActionOut & { confirmUrl: string }> {
+  requireScope(p, "links:write");
+  const action = await findOwnAction(prisma, p, input.actionId);
+  return { ...toOut(action, now()), confirmUrl: dashboardUrls.confirm(action.id) };
+}
+
+/**
+ * For the app that asked, when the user declines to open the confirm page:
+ * the request is withdrawn so its link can't be used later. Withdrawing
+ * never deletes anything, so no session is needed. Only pending requests
+ * change; anything else is returned as it is.
+ */
+export async function withdrawPendingAction(
+  p: Principal,
+  input: { actionId: string },
+  { prisma, now = () => new Date() }: Deps,
+): Promise<PendingActionOut> {
+  requireScope(p, "links:write");
+  const action = await findOwnAction(prisma, p, input.actionId);
+  if (statusOf(action, now()) === "pending") {
+    // Only if still open: the user may be confirming at this moment.
+    await prisma.pendingAction.updateMany({ where: { id: action.id, completedAt: null, cancelledAt: null }, data: { cancelledAt: now() } });
   }
-  return toOut((await prisma.pendingAction.findUnique({ where: { id: action.id } }))!, now());
+  return toOut(await prisma.pendingAction.findUniqueOrThrow({ where: { id: action.id } }), now());
 }
 
 export async function cancelPendingAction(

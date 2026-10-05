@@ -16,8 +16,10 @@ import * as links from "./service";
 
 export const DeleteToolOutput = {
   status: z
-    .enum(["deleted", "confirmation_required"])
-    .describe("deleted: the link is gone. confirmation_required: nothing was deleted yet; share confirmUrl with the user."),
+    .enum(["deleted", "confirmation_required", "not_deleted"])
+    .describe(
+      "deleted: the link is gone. confirmation_required: nothing was deleted yet; share confirmUrl with the user. not_deleted: the user declined or cancelled, or the confirmation expired; message says which.",
+    ),
   id: z.string().optional().describe("ID of the deleted link (status deleted)."),
   slug: z.string().optional().describe("Slug of the link."),
   confirmUrl: z.string().optional().describe("Link the user must open to confirm the deletion (status confirmation_required)."),
@@ -110,7 +112,7 @@ export function linksTools({ prisma }: { prisma: PrismaClient }) {
         toolset: "links",
         scope: "links:write",
         description:
-          "Permanently deletes a link and its click history. Depending on the user's settings it either deletes immediately (status deleted) or returns status confirmation_required with a confirmUrl: then nothing is deleted until the user opens that link and confirms, so share it with them. Consider update_link with archived: true instead if they might want it back.",
+          "Permanently deletes a link and its click history. Depending on the user's settings it either deletes immediately (status deleted) or needs the user to confirm in Linkly first. Clients that can open web pages show the confirmation page themselves, and the call returns once the user decides (status deleted or not_deleted). Otherwise it returns status confirmation_required with a confirmUrl: nothing is deleted until the user opens that link and confirms, so share it with them. Consider update_link with archived: true instead if they might want it back.",
         input: { id: linkIdSchema },
         output: DeleteToolOutput,
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { SERVER_URL } from "./env";
+import { CLIENT_URL, SERVER_URL } from "./env";
 import { apiClient } from "./fixtures/api";
 import { db } from "./fixtures/db";
-import { connectMcp, textOf } from "./fixtures/mcp";
+import { connectMcp, connectMcpWithUrlElicitation, textOf } from "./fixtures/mcp";
 import { authorizeUrl, consent, oauthTokens, pkcePair, startTestClient, tokenRequest, type TestClient } from "./fixtures/testClient";
 import { createVerifiedUser, gotoReady, logIn, type TestUser } from "./fixtures/users";
 
@@ -249,6 +249,55 @@ test.describe("M7: deletions that need confirmation", () => {
   });
 });
 
+test.describe("M12: confirming with URL-mode elicitation", () => {
+  test("a 2026-07-28 client opens the confirm page itself, and delete_link returns once the user confirms", async ({ page }) => {
+    const tokens = await oauthTokens(page, client, user); // confirmation on; the page stays logged in
+    const opened: string[] = [];
+    let confirming: Promise<void> | undefined;
+    const mcp = await connectMcpWithUrlElicitation(tokens.access_token, async (url) => {
+      opened.push(url);
+      // Like a real client: open the page, answer "accept" at once, and let
+      // the user confirm while the server waits on the retry.
+      confirming = (async () => {
+        await gotoReady(page, new URL(url).pathname);
+        await expect(page.getByTestId("requested-by")).toHaveText("Test Client");
+        await page.getByRole("button", { name: "Confirm delete" }).click();
+        await expect(page.getByTestId("action-completed")).toBeVisible();
+      })();
+      return "accept";
+    });
+    try {
+      expect(mcp.client.getProtocolEra()).toBe("modern");
+      const { id, slug } = (await mcp.call("create_link", { destinationUrl: "https://example.com/elicit" })).structuredContent as { id: string; slug: string };
+
+      const res = await mcp.call("delete_link", { id });
+      await confirming;
+      expect(res.structuredContent).toEqual({ status: "deleted", id, slug, actionId: expect.any(String), message: expect.stringContaining("confirmed") });
+      expect(opened).toEqual([expect.stringMatching(new RegExp(`^${CLIENT_URL}/confirm/[0-9a-f-]{36}$`))]);
+      expect((await mcp.call("get_link", { id })).isError).toBe(true);
+    } finally {
+      await mcp.close();
+    }
+  });
+
+  test("declining to open the page withdraws the request", async ({ page }) => {
+    const tokens = await oauthTokens(page, client, user);
+    let confirmPath = "";
+    const mcp = await connectMcpWithUrlElicitation(tokens.access_token, async (url) => ((confirmPath = new URL(url).pathname), "decline"));
+    try {
+      const { id } = (await mcp.call("create_link", { destinationUrl: "https://example.com/keep" })).structuredContent as { id: string };
+      expect((await mcp.call("delete_link", { id })).structuredContent).toMatchObject({ status: "not_deleted" });
+      expect((await mcp.call("get_link", { id })).isError).toBeFalsy();
+      // The link the user never opened can't be used later.
+      await gotoReady(page, confirmPath);
+      await expect(page.getByTestId("action-cancelled")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Confirm delete" })).toHaveCount(0);
+    } finally {
+      await mcp.close();
+    }
+  });
+});
+
 test.describe("M8: toolsets and scopes", () => {
   const CORE = ["get_dashboard_url", "read_doc", "search_docs", "whoami"];
   const ANALYTICS = ["get_link_stats", "get_top_links"];
@@ -261,8 +310,8 @@ test.describe("M8: toolsets and scopes", () => {
 
     const all = await connectMcp(tokens.access_token);
     expect(await all.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
-    const denied = await all.call("list_links");
-    expect(denied.isError).toBe(true); // not listed, and not callable either
+    // Not listed, and not callable either: an unknown tool is a protocol error.
+    await expect(all.call("list_links")).rejects.toThrow(/Tool list_links not found/);
     await all.close();
 
     const widened = await connectMcp(tokens.access_token, "?toolsets=links,analytics");
@@ -280,7 +329,7 @@ test.describe("M8: toolsets and scopes", () => {
 
     const mcp = await connectMcp(tokens.access_token);
     expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, "get_link", "list_links"].sort());
-    expect((await mcp.call("create_link", { destinationUrl: "https://example.com" })).isError).toBe(true);
+    await expect(mcp.call("create_link", { destinationUrl: "https://example.com" })).rejects.toThrow(/Tool create_link not found/);
     await mcp.close();
   });
 

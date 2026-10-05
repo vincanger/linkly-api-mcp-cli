@@ -34,7 +34,7 @@ Three details make it agent-specific:
 
 - **"App address: claude.ai" with no registration.** Explained [below](#no-registration-client-id-metadata-documents).
 - **One checkbox per permission.** Standard OAuth scopes, grouped by toolset, so you can allow viewing links without allowing changes. Untick "View click analytics" and the agent never sees those tools.
-- **"Require confirmation for destructive actions".** If the agent deletes something, you get a link to confirm in Linkly instead of the deletion happening right away.
+- **"Require confirmation for destructive actions".** If the agent deletes something, you confirm it in Linkly first instead of the deletion happening right away. Some clients, such as the Claude Code CLI, open the confirmation page for you after asking; the rest give you a link.
 
 ## The login, step by step
 
@@ -162,4 +162,4 @@ claude mcp add --transport http linkly http://localhost:3001/mcp \
   --header "Authorization: Bearer lk_pat_..."
 ```
 
-Then try "What Linkly account am I connected to?", create a link, ask for its stats, and ask to delete it: with "Require confirmation" on, you get a `/confirm/...` link instead of an immediate deletion. The connection appears on `/settings/connections`, where unticking a permission removes those tools on the agent's next request.
+Then try "What Linkly account am I connected to?", create a link, ask for its stats, and ask to delete it. Over OAuth with "Require confirmation" on, nothing is deleted until you confirm: the Claude Code CLI opens the `/confirm/...` page for you after asking, and other clients give you the link. With a personal access token, deletions are immediate. The connection appears on `/settings/connections`, where unticking a permission removes those tools on the agent's next request.

@@ -18,6 +18,7 @@ export default defineConfig({
       DATABASE_URL: TEST_DATABASE_URL,
       WASP_SERVER_URL: "http://localhost:3001",
       WASP_WEB_CLIENT_URL: "http://localhost:3000",
+      MCP_REQUEST_STATE_KEY: "test-only-request-state-key-0123456789abcdef",
     },
   },
 });
