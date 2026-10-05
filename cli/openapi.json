@@ -130,12 +130,12 @@
             "type": "string",
             "description": "Your Linkly user ID."
           },
-          "email": {
+          "username": {
             "type": [
               "string",
               "null"
             ],
-            "description": "The email address you log in with."
+            "description": "The username you log in with."
           },
           "source": {
             "type": "string",
@@ -187,7 +187,7 @@
         },
         "required": [
           "userId",
-          "email",
+          "username",
           "source",
           "scopes",
           "toolsets",

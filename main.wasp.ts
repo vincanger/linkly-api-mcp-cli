@@ -24,16 +24,11 @@ export default app({
   auth: {
     userEntity: "User",
     methods: {
-      email: {
-        fromField: { name: "Linkly", email: "hello@linkly.local" },
-        emailVerification: { clientRoute: "EmailVerificationRoute" },
-        passwordReset: { clientRoute: "PasswordResetRoute" },
-      },
+      usernameAndPassword: {},
     },
     onAuthFailedRedirectTo: "/login",
     onAuthSucceededRedirectTo: "/links",
   },
-  emailSender: { provider: "Dummy" },
   client: { rootComponent: Layout },
   server: { setupFn: serverSetup },
   spec: [

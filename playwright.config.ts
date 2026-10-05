@@ -29,7 +29,6 @@ export default defineConfig({
     stderr: "pipe",
     env: {
       DATABASE_URL: TEST_DATABASE_URL,
-      SKIP_EMAIL_VERIFICATION_IN_DEV: "true",
       LINKLY_ENABLE_TEST_API: "true",
       MCP_REQUEST_STATE_KEY: "test-only-request-state-key-0123456789abcdef",
     },

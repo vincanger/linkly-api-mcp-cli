@@ -41,7 +41,7 @@ test.describe("M4: OAuth with CIMD", () => {
     // Consent screen shows the client name and the client_id host.
     await page.goto(url);
     await page.waitForURL(/\/login$/);
-    await page.locator('input[name="email"]').fill(user.email);
+    await page.locator('input[name="username"]').fill(user.username);
     await page.locator('input[name="password"]').fill(user.password);
     await page.locator('button[type="submit"]').click();
     await expect(page.getByTestId("client-name")).toHaveText("Test Client");
@@ -97,7 +97,7 @@ test.describe("M4: OAuth with CIMD", () => {
     const url = authorizeUrl(client, challenge, { redirect_uri: "http://127.0.0.1:1/evil" });
     await page.goto(url);
     await page.waitForURL(/\/login$/);
-    await page.locator('input[name="email"]').fill(user.email);
+    await page.locator('input[name="username"]').fill(user.username);
     await page.locator('input[name="password"]').fill(user.password);
     await page.locator('button[type="submit"]').click();
     await expect(page.getByTestId("authorize-error")).toContainText("redirect_uri");

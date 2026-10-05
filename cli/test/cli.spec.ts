@@ -18,7 +18,7 @@ test("full link CRUD, stats, and docs through the CLI", async () => {
 
   const who = await runCli(["whoami"], { env });
   expect(who.code).toBe(0);
-  expect(who.json()).toMatchObject({ userId: user.userId, email: user.email, source: "pat" }); // piped → JSON by default
+  expect(who.json()).toMatchObject({ userId: user.userId, username: user.username, source: "pat" }); // piped → JSON by default
 
   const created = await runCli(["links", "create", "https://example.com/cli", "--slug", slug, "--tag", "cli", "--tag", "demo", "--json"], { env });
   expect(created.code).toBe(0);

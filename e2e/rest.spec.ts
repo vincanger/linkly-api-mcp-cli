@@ -20,7 +20,7 @@ test("a PAT created on the tokens page can do full CRUD over REST", async ({ pag
 
   const me = await api("GET", "/me");
   expect(me.status).toBe(200);
-  expect(me.body).toMatchObject({ userId: user.userId, email: user.email, source: "pat", confirmDestructive: false });
+  expect(me.body).toMatchObject({ userId: user.userId, username: user.username, source: "pat", confirmDestructive: false });
 
   const slug = `rest-${Date.now()}`;
   const created = await api("POST", "/links", { destinationUrl: "https://example.com/a", slug, tags: ["api"] });

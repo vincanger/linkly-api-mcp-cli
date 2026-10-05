@@ -1,13 +1,6 @@
 import type { ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
-import {
-  ForgotPasswordForm,
-  LoginForm,
-  ResetPasswordForm,
-  SignupForm,
-  VerifyEmailForm,
-  type CustomizationOptions,
-} from "wasp/client/auth";
+import { LoginForm, SignupForm, type CustomizationOptions } from "wasp/client/auth";
 import { Card, CardContent } from "../components/ui/card";
 
 // Wasp's auth forms, wrapped in shadcn cards and themed with the same tokens.
@@ -38,15 +31,9 @@ export function LoginPage() {
   return (
     <AuthCard
       footer={
-        <div className="space-y-1">
-          <p>
-            No account yet? <RouterLink className={linkClass} to="/signup">Sign up</RouterLink>
-          </p>
-          <p>
-            Forgot your password?{" "}
-            <RouterLink className={linkClass} to="/request-password-reset">Reset it</RouterLink>
-          </p>
-        </div>
+        <p>
+          No account yet? <RouterLink className={linkClass} to="/signup">Sign up</RouterLink>
+        </p>
       }
     >
       <LoginForm appearance={appearance} />
@@ -64,30 +51,6 @@ export function SignupPage() {
       }
     >
       <SignupForm appearance={appearance} />
-    </AuthCard>
-  );
-}
-
-export function EmailVerificationPage() {
-  return (
-    <AuthCard footer={<RouterLink className={linkClass} to="/login">Go to login</RouterLink>}>
-      <VerifyEmailForm appearance={appearance} />
-    </AuthCard>
-  );
-}
-
-export function RequestPasswordResetPage() {
-  return (
-    <AuthCard>
-      <ForgotPasswordForm appearance={appearance} />
-    </AuthCard>
-  );
-}
-
-export function PasswordResetPage() {
-  return (
-    <AuthCard footer={<RouterLink className={linkClass} to="/login">Go to login</RouterLink>}>
-      <ResetPasswordForm appearance={appearance} />
     </AuthCard>
   );
 }

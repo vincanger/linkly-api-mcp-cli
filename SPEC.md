@@ -675,7 +675,7 @@ export function toolsFor(principal: Principal, requestedToolsets?: Toolset[]): T
 
 `?toolsets=links,analytics` on the MCP URL is optional, for clients that let users edit the URL. Token scopes are the real enforcement, so clients without tool-selection UI still get the right set.
 
-The `whoami` tool (core) returns `{ userId, email, scopes, toolsets, confirmDestructive, dashboardUrl }`, which is useful for agents to self-orient.
+The `whoami` tool (core) returns `{ userId, username, scopes, toolsets, confirmDestructive, dashboardUrl }`, which is useful for agents to self-orient.
 
 ### 6.4 Tool inventory (final)
 
@@ -775,7 +775,7 @@ export default app({
   title: "Linkly",
   auth: {
     userEntity: "User",
-    methods: { email: { /* Dummy email sender in dev */ } },
+    methods: { usernameAndPassword: {} }, // no email sender needed to deploy
     onAuthFailedRedirectTo: "/login",
     onAuthSucceededRedirectTo: "/links",
   },
@@ -823,7 +823,7 @@ Build in this order. Each milestone ends with passing tests and a short entry in
 - **Manual checks don't block.** The MCP Inspector check (M4) and the real-client check (M5) can't be automated. Record them in `NOTES.md` under **"Manual checks still to do"** with exact steps, and continue. The Playwright end-to-end tests cover the same flows.
 - **Blocked?** If something can't be resolved from this spec or the official docs, pick the most conservative option, record it in `NOTES.md` under **"Decisions made without the author"**, and continue.
 
-**M0: Scaffold and shared kernel.** New Wasp app with email auth, Postgres, Tailwind v4, shadcn/ui (set up per 2.3), and Vitest. Implement `src/shared/*`, the Prisma schema, and the layout, login, and signup pages, all built with shadcn components.
+**M0: Scaffold and shared kernel.** New Wasp app with username-and-password auth, Postgres, Tailwind v4, shadcn/ui (set up per 2.3), and Vitest. Implement `src/shared/*`, the Prisma schema, and the layout, login, and signup pages, all built with shadcn components.
 *Accept:* app runs, a user can sign up and log in, `errors.ts` and `principal.ts` have unit tests, the `tsconfig.json` has no `@` alias left in it, and `grep -r '"@/' src/` finds nothing.
 
 **M1: Links slice (dashboard only).** Service, operations, UI.
@@ -986,7 +986,7 @@ Wasp only runs client tests (`wasp test client`) and doesn't support server-side
 - **CLI tests (`cli/test/`):** run the built binary as a subprocess against a test server with a PAT. Cover full link CRUD, `--json` output that parses and matches REST, delete refused without `--yes` (exit 2), bad token (exit 3), unknown link (exit 5), and a check that no command reads stdin unless `--token-stdin` is passed (run with stdin closed; nothing hangs).
 - **CLI parity test:** a map from every MCP tool to its CLI command (or an explicit `"no-cli: <reason>"`). Fails when either side changes without the map.
 - **Snapshot drift test:** `cli/openapi.json` equals the server's live `/api/v1/openapi.json`.
-- **Verified test users (`e2e/fixtures/users.ts`, also used by Vitest):** tests never go through signup or email verification. They create users directly with Wasp's server-side auth helpers and mark the email as already verified (check the Wasp email auth docs for the current API, e.g. `createUser` with `isEmailVerified: true`). The fixture returns `{ email, password }` so browser tests can log in through the real login page. For manual local testing, Wasp's `SKIP_EMAIL_VERIFICATION_IN_DEV=true` in `.env.server` is fine, but automated tests must not depend on it or on reading the dummy email sender's log.
+- **Verified test users (`e2e/fixtures/users.ts`, also used by Vitest):** tests never go through signup. They create users directly with Wasp's server-side auth helpers (`createUser` with a `username` provider ID). The fixture returns `{ userId, username, password }` so browser tests can log in through the real login page. Linkly uses username-and-password auth so a deployment needs no email sender; a real product would likely use email or social login instead.
 - **End-to-end OAuth test (`e2e/oauth.spec.ts`, Playwright, headless):**
   - **Setup:** `playwright.config.ts` uses `webServer` to run `wasp start` against the `linkly_test` database. `wasp start` always sets `NODE_ENV=development`, which the SSRF local-dev exception allows. The `testClient.ts` fixture starts a server on a random localhost port that serves `http://localhost:<port>/client.json`, a CIMD document with `redirect_uris: ["http://127.0.0.1:<port>/callback"]`. It also records the `code` and `state` that arrive at `/callback`.
   - **Flow:** build a PKCE verifier and challenge, open `/oauth/authorize?...` in the Playwright page, log in as a verified fixture user, check that the consent screen shows the client name and the host `localhost`, pick toolsets, click Allow, read the code from the fixture, and `POST /oauth/token`.

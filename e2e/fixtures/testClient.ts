@@ -79,7 +79,7 @@ export async function consent(
   await page.goto(authUrl);
   await page.waitForLoadState("networkidle");
   if (new URL(page.url()).pathname === "/login") {
-    await page.locator('input[name="email"]').fill(user.email);
+    await page.locator('input[name="username"]').fill(user.username);
     await page.locator('input[name="password"]').fill(user.password);
     await page.locator('button[type="submit"]').click();
   }

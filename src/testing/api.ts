@@ -1,5 +1,5 @@
 // Test-only endpoints used by the Playwright/live-server tests to create
-// fixtures without going through signup or email verification. They 404
+// fixtures without going through signup. They 404
 // unless LINKLY_ENABLE_TEST_API=true, and never work in production.
 import { randomUUID } from "node:crypto";
 import type { Request, Response } from "express";
@@ -15,15 +15,10 @@ export const createTestUser: CreateTestUser = async (req: Request, res: Response
     res.status(404).json({ error: { code: "not_found", message: "Not found." } });
     return;
   }
-  const email = (typeof req.body?.email === "string" && req.body.email) || `user-${randomUUID()}@example.com`;
+  const username = (typeof req.body?.username === "string" && req.body.username) || `user-${randomUUID()}`;
   const password = (typeof req.body?.password === "string" && req.body.password) || "test-password-123";
 
-  const providerData = await sanitizeAndSerializeProviderData<"email">({
-    hashedPassword: password,
-    isEmailVerified: true,
-    emailVerificationSentAt: null,
-    passwordResetSentAt: null,
-  });
-  const user = await createUser(createProviderId("email", email), providerData, {});
-  res.json({ userId: user.id, email, password });
+  const providerData = await sanitizeAndSerializeProviderData<"username">({ hashedPassword: password });
+  const user = await createUser(createProviderId("username", username), providerData, {});
+  res.json({ userId: user.id, username, password });
 };

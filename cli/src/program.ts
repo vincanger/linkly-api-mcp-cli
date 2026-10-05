@@ -56,7 +56,7 @@ export function buildProgram(io: Io, readStdin: () => Promise<string>): Command 
     .addHelpText("after", examples("linkly whoami"))
     .action(async () => {
       const { data } = await unwrap(api().GET("/me"));
-      out(data, () => fields([["Email", data.email], ["User ID", data.userId], ["Token", data.source], ["Scopes", data.scopes.join(" ")], ["Dashboard", data.dashboardUrl]]));
+      out(data, () => fields([["Username", data.username], ["User ID", data.userId], ["Token", data.source], ["Scopes", data.scopes.join(" ")], ["Dashboard", data.dashboardUrl]]));
     });
 
   // ── links ─────────────────────────────────────────────────────────────
@@ -229,7 +229,7 @@ export function buildProgram(io: Io, readStdin: () => Promise<string>): Command 
       const url = resolveUrl(g());
       const { data } = await unwrap(createApi(url, token).GET("/me"));
       writeConfig({ ...readConfig(), url, token });
-      out({ ...data, configPath: configPath() }, () => `Logged in to ${url} as ${data.email ?? data.userId}. Saved to ${configPath()}.`);
+      out({ ...data, configPath: configPath() }, () => `Logged in to ${url} as ${data.username ?? data.userId}. Saved to ${configPath()}.`);
     });
 
   auth

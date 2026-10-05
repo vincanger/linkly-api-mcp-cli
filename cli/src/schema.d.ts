@@ -193,8 +193,8 @@ export interface components {
         Whoami: {
             /** @description Your Linkly user ID. */
             userId: string;
-            /** @description The email address you log in with. */
-            email: string | null;
+            /** @description The username you log in with. */
+            username: string | null;
             /**
              * @description How this request is authenticated: dashboard session, personal access token, or OAuth connection.
              * @enum {string}
