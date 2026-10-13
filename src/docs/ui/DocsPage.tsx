@@ -2,17 +2,22 @@ import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link as RouterLink, useParams } from "react-router";
 import { config } from "wasp/client";
+import { useOrigin } from "../../app/useOrigin";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { DOCS } from "../content";
 import { fillTemplate, searchDocs } from "../service";
 
-const urls = () => ({ serverUrl: config.apiUrl.replace(/\/+$/, ""), appUrl: window.location.origin });
+/** Both pages are prerendered: dashboard links stay root-relative until the page hydrates. */
+function useDocUrls() {
+  return { serverUrl: config.apiUrl.replace(/\/+$/, ""), appUrl: useOrigin() };
+}
 
 /** /docs: index with search. */
 export function DocsIndexPage() {
   const [query, setQuery] = useState("");
+  const urls = useDocUrls();
   const results = useMemo(() => {
     if (!query.trim()) return null;
     try {
@@ -27,7 +32,7 @@ export function DocsIndexPage() {
       <h1 className="font-heading text-2xl font-semibold">Docs</h1>
       <Input type="search" aria-label="Search docs" placeholder="Search the docs…" value={query} onChange={(e) => setQuery(e.target.value)} />
       <div className="grid gap-3">
-        {(results ?? DOCS.map((d) => ({ slug: d.slug, title: d.title, snippet: fillTemplate(d.body, urls()).split("\n")[0] }))).map((r) => (
+        {(results ?? DOCS.map((d) => ({ slug: d.slug, title: d.title, snippet: fillTemplate(d.body, urls).split("\n")[0] }))).map((r) => (
           <RouterLink key={r.slug} to={`/docs/${r.slug}`} className="block">
             <Card className="transition-colors hover:bg-muted/50">
               <CardHeader>
@@ -46,6 +51,7 @@ export function DocsIndexPage() {
 /** /docs/:slug: one doc rendered from Markdown. Honors dashboardUrls.doc(slug). */
 export function DocPage() {
   const { slug = "" } = useParams();
+  const urls = useDocUrls();
   const doc = DOCS.find((d) => d.slug === slug);
   if (!doc) {
     return (
@@ -65,7 +71,7 @@ export function DocPage() {
         ))}
       </div>
       <div className="prose prose-neutral max-w-none dark:prose-invert">
-        <ReactMarkdown>{fillTemplate(doc.body, urls())}</ReactMarkdown>
+        <ReactMarkdown>{fillTemplate(doc.body, urls)}</ReactMarkdown>
       </div>
     </article>
   );

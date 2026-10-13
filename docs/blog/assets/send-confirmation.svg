@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 900 476" role="img" aria-labelledby="t d">
+  <title id="t">Who answers "are you sure?": API vs. MCP</title>
+  <desc id="d">Two panels side by side. An agent emails the mailing list about a community call, with a date that has since changed. With only an API, the API's request for confirmation goes back to the agent, which answers confirm=true by itself, and 2,043 people get the old date. With MCP, the server's question goes to the client app instead, which shows you the email: "Email 2,043 people? Community call, Thu, Nov 12, 5pm." You notice the date is wrong and click Cancel, nothing is sent, and the agent learns you cancelled.</desc>
+  <style>
+    svg {
+      --bg: #ffffff; --band: #f3f5f8; --box: #f8fafb; --ink: #15202b; --muted: #5a6774; --line: #cbd3db;
+      --mcp: #8b3fcf; --rest: #0f8577; --ask: #b06a00; --warn: #c4382f; --warn-bg: #fbeaea; --ok: #23863a; --ok-bg: #e9f5ec; --on: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      svg {
+        --bg: #0e141a; --band: #151d25; --box: #1b2530; --ink: #e4ebf1; --muted: #95a3b0; --line: #2c3845;
+        --mcp: #c18bf2; --rest: #3fc1ae; --ask: #f0a63a; --warn: #ff7b72; --warn-bg: #3a1d1d; --ok: #5ccb74; --ok-bg: #173323; --on: #0e141a;
+      }
+    }
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; fill: var(--ink); }
+    .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+    .bg { fill: var(--bg); }
+    .band { fill: var(--band); }
+    .h { font-size: 16px; font-weight: 700; }
+    .box { fill: var(--box); stroke: var(--line); stroke-width: 1; }
+    .t { font-size: 15px; font-weight: 600; }
+    .s { font-size: 12px; fill: var(--muted); }
+    .wire { fill: none; stroke: var(--line); stroke-width: 2.5; stroke-linecap: round; }
+    .pkt { stroke: var(--bg); stroke-width: 2.5; }
+    .glow-warn { fill: none; stroke: var(--warn); stroke-width: 3; }
+    .tag { font-size: 12.5px; fill: var(--muted); font-style: italic; }
+    .tag-warn { font-size: 12.5px; fill: var(--warn); font-weight: 600; }
+    .bad-bg { fill: var(--warn-bg); }
+    .ok-bg { fill: var(--ok-bg); }
+    .x { fill: none; stroke: var(--warn); stroke-width: 2.2; stroke-linecap: round; }
+    .ck { fill: none; stroke: var(--ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .dialog { fill: var(--bg); stroke: var(--mcp); stroke-width: 1.5; }
+    .dq { font-size: 12.5px; font-weight: 600; }
+    .btn-ghost { fill: none; stroke: var(--line); stroke-width: 1; }
+    .btn { fill: var(--mcp); }
+    .press { fill: none; stroke: var(--mcp); stroke-width: 2; }
+    .bt { font-size: 12px; font-weight: 600; }
+    .bt-on { fill: var(--on); }
+    .sep { stroke: var(--line); stroke-width: 1; }
+    .env { fill: var(--box); stroke-width: 1.6; }
+    .dp { font-size: 12px; }
+    .hl { fill: var(--warn-bg); stroke: var(--warn); stroke-width: 1; }
+    .tag-ok { font-size: 12.5px; fill: var(--ok); font-weight: 600; }
+    .env-flap { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+    .num { font-size: 12px; font-weight: 700; fill: var(--on); }
+    .cap { font-size: 14px; }
+    .cursor { fill: #15202b; stroke: #ffffff; stroke-width: 1.3; stroke-linejoin: round; }
+  </style>
+
+  <rect class="bg" width="900" height="476" rx="14"/>
+
+  <g transform="translate(12,12)">
+    <rect class="band" width="428" height="452" rx="10"/>
+    <rect width="428" height="5" rx="2.5" style="fill:var(--rest)"/>
+    <text class="h" x="18" y="34">With only an API</text>
+    <path id="a-a2s" fill="none" d="M262 207.0 H129.0 V308"/>
+    <path id="a-s2a" fill="none" d="M129.0 308 V207.0 H262"/>
+    <path id="a-s2c" fill="none" d="M129.0 308 V234"/>
+    <path id="a-c2y" fill="none" d="M129.0 180 V106"/>
+    <path id="a-y2s" fill="none" d="M129.0 106 V308"/>
+    <path id="a-mail" fill="none" d="M236 335.0 C302 335.0, 352 325.0, 408 301.0"/>
+    <path class="wire" d="M129.0 106 V180"/>
+    <path class="wire" d="M129.0 234 V308"/>
+    <path class="wire" d="M222 207.0 H262"/>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--rest)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.0214;0.1429;1"><mpath xlink:href="#a-a2s"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.0214;0.1429"/></circle>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--ask)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.1571;0.2786;1"><mpath xlink:href="#a-s2a"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.1571;0.2786"/></circle>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--warn)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.3429;0.4643;1"><mpath xlink:href="#a-a2s"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.3429;0.4643"/></circle>
+    <g opacity="0"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.4714;0.5429;1"><mpath xlink:href="#a-mail"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.4714;0.5429"/><rect class="env" x="-11" y="-7.5" width="22" height="15" rx="2" style="stroke:var(--rest)"/><path class="env-flap" d="M-11 -7.5 L0 1.5 L11 -7.5" style="stroke:var(--rest)"/></g><g opacity="0"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.4857;0.5571;1"><mpath xlink:href="#a-mail"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.4857;0.5571"/><rect class="env" x="-11" y="-7.5" width="22" height="15" rx="2" style="stroke:var(--rest)"/><path class="env-flap" d="M-11 -7.5 L0 1.5 L11 -7.5" style="stroke:var(--rest)"/></g><g opacity="0"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.5000;0.5714;1"><mpath xlink:href="#a-mail"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.5000;0.5714"/><rect class="env" x="-11" y="-7.5" width="22" height="15" rx="2" style="stroke:var(--rest)"/><path class="env-flap" d="M-11 -7.5 L0 1.5 L11 -7.5" style="stroke:var(--rest)"/></g>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--rest)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.5571;0.6786;1"><mpath xlink:href="#a-s2a"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.5571;0.6786"/></circle>
+    <g transform="translate(36,52)"><rect class="box" width="186" height="54" rx="9"/><text class="t" x="14" y="25">You</text><text class="s" x="14" y="43">the person who asked</text></g>
+    <g transform="translate(36,180)"><rect class="box" width="186" height="54" rx="9"/><text class="t" x="14" y="25">Client app</text><text class="s" x="14" y="43">just relays replies</text></g>
+    <g transform="translate(262,180)"><rect class="box" width="154" height="54" rx="9"/><text class="t" x="14" y="25">Agent</text><text class="s" x="14" y="43">the model</text></g>
+    <g transform="translate(36,308)"><rect class="box" width="186" height="54" rx="9"/><rect width="186" height="4" rx="2" style="fill:var(--rest)"/><text class="t" x="14" y="25">Your API</text><text class="s mono" x="14" y="43">POST /campaigns/send</text></g>
+    <rect class="glow-warn" x="262" y="180" width="154" height="54" rx="9" opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.2786;0.4643"/></rect>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.3000"/><text class="tag-warn" x="339.0" y="254" text-anchor="middle">answers for you</text></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.6786"/><circle cx="200" cy="79.0" r="10" class="bad-bg"/><path class="x" d="M196 75.0 l8 8 M204 75.0 l-8 8"/><text class="tag-warn" x="240" y="84.0">never asked</text></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.5286"/><text class="tag" x="416" y="366" text-anchor="end">→ 2,043 inboxes</text></g>
+    <line class="sep" x1="16" y1="382" x2="412" y2="382"/>
+    <g opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="1;0" keyTimes="0;0.1571"/><circle cx="36" cy="410" r="12" style="fill:var(--rest)"/><text x="36" y="414.5" text-anchor="middle" class="num">1</text><text class="cap" x="58" y="405">The agent asks your API to email the</text><text class="cap" x="58" y="425">mailing list about the community call.</text></g>
+    <g opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.1571;0.3286"/><circle cx="36" cy="410" r="12" style="fill:var(--ask)"/><text x="36" y="414.5" text-anchor="middle" class="num">2</text><text class="cap" x="58" y="405">Your API wants a confirmation:</text><text class="cap" x="58" y="425">“2,043 recipients. Resend with confirm=true.”</text></g>
+    <g opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.3286;0.4714"/><circle cx="36" cy="410" r="12" style="fill:var(--warn)"/><text x="36" y="414.5" text-anchor="middle" class="num">3</text><text class="cap" x="58" y="405">The question went to the agent,</text><text class="cap" x="58" y="425">so the agent answers it: confirm=true.</text></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.4714"/><circle cx="36" cy="410" r="12" style="fill:var(--warn)"/><text x="36" y="414.5" text-anchor="middle" class="num">4</text><text class="cap" x="58" y="405">2,043 people get the old date.</text><text class="cap" x="58" y="425">Nobody asked you, and you can't unsend it.</text></g>
+  </g>
+
+  <g transform="translate(460,12)">
+    <rect class="band" width="428" height="452" rx="10"/>
+    <rect width="428" height="5" rx="2.5" style="fill:var(--mcp)"/>
+    <text class="h" x="18" y="34">With MCP</text>
+    <path id="m-a2s" fill="none" d="M262 207.0 H129.0 V308"/>
+    <path id="m-s2a" fill="none" d="M129.0 308 V207.0 H262"/>
+    <path id="m-s2c" fill="none" d="M129.0 308 V234"/>
+    <path id="m-c2y" fill="none" d="M129.0 180 V106"/>
+    <path id="m-y2s" fill="none" d="M129.0 106 V308"/>
+    <path id="m-mail" fill="none" d="M236 335.0 C302 335.0, 352 325.0, 408 301.0"/>
+    <path class="wire" d="M129.0 106 V180"/>
+    <path class="wire" d="M129.0 234 V308"/>
+    <path class="wire" d="M222 207.0 H262"/>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--mcp)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.0214;0.1429;1"><mpath xlink:href="#m-a2s"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.0214;0.1429"/></circle>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--ask)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.1571;0.2286;1"><mpath xlink:href="#m-s2c"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.1571;0.2286"/></circle>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--ask)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.2429;0.3143;1"><mpath xlink:href="#m-c2y"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.2429;0.3143"/></circle>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--warn)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.4714;0.5929;1"><mpath xlink:href="#m-y2s"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.4714;0.5929"/></circle>
+    <circle class="pkt" r="7" opacity="0" style="fill:var(--mcp)"><animateMotion dur="14s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.6071;0.7286;1"><mpath xlink:href="#m-s2a"/></animateMotion><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.6071;0.7286"/></circle>
+    <g transform="translate(36,52)"><rect class="box" width="186" height="54" rx="9"/><text class="t" x="14" y="25">You</text><text class="s" x="14" y="43">the person who asked</text></g>
+    <g transform="translate(36,180)"><rect class="box" width="186" height="54" rx="9"/><text class="t" x="14" y="25">Client app</text><text class="s" x="14" y="43">handles the question</text></g>
+    <g transform="translate(262,180)"><rect class="box" width="154" height="54" rx="9"/><text class="t" x="14" y="25">Agent</text><text class="s" x="14" y="43">the model</text></g>
+    <g transform="translate(36,308)"><rect class="box" width="186" height="54" rx="9"/><rect width="186" height="4" rx="2" style="fill:var(--mcp)"/><text class="t" x="14" y="25">Your MCP server</text><text class="s mono" x="14" y="43">send_campaign tool</text></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.3143"/><text class="tag" x="339.0" y="254" text-anchor="middle">never sees the question</text></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.3143"/><g transform="translate(232,40)"><rect class="dialog" width="186" height="104" rx="9"/><text class="dq" x="12" y="21">Email 2,043 people?</text><text class="dp" x="12" y="40">“Community call”</text><rect class="hl" x="7" y="46" width="128" height="19" rx="4" opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.3714"/></rect><text class="dp" x="12" y="59.5">Thu, Nov 12 · 5pm</text><rect class="btn-ghost" x="14" y="70" width="74" height="26" rx="6"/><rect class="press" x="11" y="67" width="80" height="32" rx="8" opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.4286"/></rect><text class="bt" x="51" y="87.5" text-anchor="middle">Cancel</text><rect class="btn" x="98" y="70" width="74" height="26" rx="6"/><text class="bt bt-on" x="135" y="87.5" text-anchor="middle">Send</text></g></g>
+    <g transform="translate(286,128)"><g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.3786"/><g><animateTransform attributeName="transform" type="translate" dur="14s" repeatCount="indefinite" calcMode="spline" keySplines="0 0 1 1; 0.4 0 0.2 1; 0 0 1 1" values="44 50;44 50;0 0;0 0" keyTimes="0;0.3857;0.4214;1"/><g><animateTransform attributeName="transform" type="scale" dur="14s" repeatCount="indefinite" values="1;1;0.82;1;1" keyTimes="0;0.4243;0.4286;0.4371;1"/><path class="cursor" d="M0 0 L0 17 L4.2 13.2 L7 19.6 L9.9 18.3 L7.2 12 L12.6 12 Z"/></g></g></g></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.4429"/><circle cx="200" cy="79.0" r="10" class="ok-bg"/><path class="ck" d="M195 79.0 l4 4 l8 -8"/></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.5929"/><circle cx="244" cy="335.0" r="10" class="bad-bg"/><path class="x" d="M240 331.0 l8 8 M248 331.0 l-8 8"/></g>
+    <line class="sep" x1="16" y1="382" x2="412" y2="382"/>
+    <g opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="1;0" keyTimes="0;0.1571"/><circle cx="36" cy="410" r="12" style="fill:var(--mcp)"/><text x="36" y="414.5" text-anchor="middle" class="num">1</text><text class="cap" x="58" y="405">The agent calls send_campaign for</text><text class="cap" x="58" y="425">everyone on the mailing list.</text></g>
+    <g opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.1571;0.3286"/><circle cx="36" cy="410" r="12" style="fill:var(--ask)"/><text x="36" y="414.5" text-anchor="middle" class="num">2</text><text class="cap" x="58" y="405">Your server asks a question. It goes</text><text class="cap" x="58" y="425">to the client, not to the agent.</text></g>
+    <g opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.3286;0.4714"/><circle cx="36" cy="410" r="12" style="fill:var(--ask)"/><text x="36" y="414.5" text-anchor="middle" class="num">3</text><text class="cap" x="58" y="405">The client shows you what's about to go out.</text><text class="cap" x="58" y="425">Wait: the call moved to Nov 19.</text></g>
+    <g opacity="0"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1;0" keyTimes="0;0.4714;0.6071"/><circle cx="36" cy="410" r="12" style="fill:var(--warn)"/><text x="36" y="414.5" text-anchor="middle" class="num">4</text><text class="cap" x="58" y="405">You click Cancel, and the client sends</text><text class="cap" x="58" y="425">your answer back to the server.</text></g>
+    <g opacity="1"><animate attributeName="opacity" dur="14s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.6071"/><circle cx="36" cy="410" r="12" style="fill:var(--ok)"/><text x="36" y="414.5" text-anchor="middle" class="num">5</text><text class="cap" x="58" y="405">Nothing was sent. The agent learns you</text><text class="cap" x="58" y="425">cancelled, and you can fix the date.</text></g>
+  </g>
+</svg>

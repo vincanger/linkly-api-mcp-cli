@@ -16,7 +16,7 @@ What to build so AI agents can use your app, in what order, and how Linkly does 
 | **CLI over the API** | Humans and agents with a shell; composes with pipes and `jq` | Needs a runtime and a shell. Nearly free if generated from OpenAPI |
 | **MCP server** | Agents in chat apps: users paste one URL and click Allow | OAuth is the real work |
 | **ChatGPT GPT Actions** | A custom GPT that calls your REST API from your OpenAPI spec | ChatGPT only; each GPT is configured separately |
-| **`llms.txt`, with OpenAPI at `/.well-known`** | Agents given only your site's address | `llms.txt` is a convention and the `/.well-known` path is a proposal. A single-page app also needs prerendered pages, or agents see an empty page (Linkly's optional M10 in [SPEC.md](../SPEC.md#optional-milestones)) |
+| **`llms.txt`, with OpenAPI at `/.well-known`** | Agents given only your site's address | `llms.txt` is a convention and the `/.well-known` path is a proposal. A single-page app also needs prerendered pages, or agents see an empty page (Linkly does this: see [Discovery without MCP](ARCHITECTURE.md#discovery-without-mcp)) |
 | **Browser automation** | Apps you don't control | Slow and brittle. Not something to design for |
 
 ## The OpenAPI shortcut

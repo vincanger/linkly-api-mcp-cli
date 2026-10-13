@@ -13,6 +13,8 @@ import { oauthSpec } from "./src/oauth/oauth.wasp";
 import { mcpSpec } from "./src/mcp/mcp.wasp";
 import { docsSpec } from "./src/docs/docs.wasp";
 import { deeplinksSpec } from "./src/deeplinks/deeplinks.wasp";
+import { discoverySpec } from "./src/discovery/discovery.wasp";
+import { LLMS_TXT_PATH } from "./src/discovery/paths";
 
 // The Wasp Spec only joins the slices. Each slice declares its own pages,
 // routes, operations, and APIs in its `<slice>.wasp.ts` file.
@@ -20,7 +22,11 @@ export default app({
   name: "linkly",
   wasp: { version: "^0.25.0" },
   title: "Linkly",
-  head: ["<link rel='icon' href='/favicon.ico' />"],
+  head: [
+    "<link rel='icon' href='/favicon.ico' />",
+    // Cheap, but few agents look for it: the "For AI agents" text on the homepage is what they read.
+    `<link rel='alternate' type='text/markdown' href='${LLMS_TXT_PATH}' />`,
+  ],
   auth: {
     userEntity: "User",
     methods: {
@@ -46,6 +52,7 @@ export default app({
     mcpSpec,
     docsSpec,
     deeplinksSpec,
+    discoverySpec,
     testingSpec,
   ],
 });

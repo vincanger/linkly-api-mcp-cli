@@ -25,7 +25,7 @@ Start at the top and go deeper as you need to:
 3. [`docs/OAUTH-FOR-AGENTS.md`](docs/OAUTH-FOR-AGENTS.md): how an MCP client logs in with no registration, for newcomers to OAuth.
 4. [`docs/AGENT-READY-APPS.md`](docs/AGENT-READY-APPS.md) covers when to use the options (API, CLI, MCP), auth, and the fastest path. It also includes notes on what Wasp can do to provide these in the future.
 
-For the build itself, [`SPEC.md`](SPEC.md) is the full spec. Of its optional milestones, M12 (confirming deletions through URL-mode elicitation) is built; M10 (agent discovery) and M11 (Dynamic Client Registration) aren't yet.
+For the build itself, [`SPEC.md`](SPEC.md) is the full spec. Of its optional milestones, M10 (agent discovery: `llms.txt`, prerendered pages, and OpenAPI at `/.well-known`) and M12 (confirming deletions through URL-mode elicitation) are built; M11 (Dynamic Client Registration) isn't yet.
 
 ## Run it
 
@@ -81,6 +81,7 @@ linkly links list --json | jq '.data[].shortUrl'
 ```bash
 npm test          # server + CLI unit tests (Vitest, against the linkly_test database)
 npm run test:e2e  # Playwright: starts `wasp start` on linkly_test, runs browser, REST, MCP, OAuth, and CLI tests
+npm run test:build  # wasp build + a client build: llms.txt and prerendered pages (not while wasp start runs)
 ```
 
 Create the test database once: `docker exec <wasp-dev-db container> psql -U postgresWaspDevUser -c "CREATE DATABASE linkly_test;"`, or point `TEST_DATABASE_URL` at any Postgres database. What each kind of test covers is in [Testing strategy](docs/ARCHITECTURE.md#testing-strategy).

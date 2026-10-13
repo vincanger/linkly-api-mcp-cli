@@ -8,6 +8,7 @@ Read this first. Linkly is a link shortener, but the product is only the vehicle
 - [If the MCP tools match the API, why have MCP?](#if-the-mcp-tools-match-the-api-why-have-mcp)
 - [Why the MCP server is stateless](#why-the-mcp-server-is-stateless)
 - [How OAuth works here](#how-oauth-works-here)
+- [Discovery without MCP](#discovery-without-mcp)
 - [Testing strategy](#testing-strategy)
 
 ## Vertical slices and the adapter rule
@@ -153,10 +154,33 @@ This section is the short, code-first version. New to OAuth for agents? Watch [H
 4. **Code for tokens.** [`exchangeToken`](../src/oauth/token.ts) verifies the single-use, 60-second code and the PKCE S256 verifier, creates or updates one grant per user and client, and issues a 1-hour access token (audience-bound to `/mcp` or `/api/v1`) and a 30-day refresh token. Refresh tokens rotate on every use; reusing one, or reusing a code, revokes the whole grant.
 5. **Every request.** [`authenticateBearer`](../src/shared/bearer.ts) hashes the token (only SHA-256 hashes are stored), checks expiry, revocation, and audience, and builds the principal's permissions **from the grant** (see [Toolsets and customization](#toolsets-and-customization)).
 
+## Discovery without MCP
+
+Say a user tells their agent "use linkly.example.com" and nothing else. An MCP client could be handed the MCP URL, but this agent only has the dashboard's address, and it might not speak MCP at all. Linkly gives it a path from that address to a working API call, where the only human step left is the one that has to stay: clicking Allow on the consent screen, or creating a token. The code is in [`src/discovery/`](../src/discovery), and it only adds metadata and build output, no new business logic.
+
+**The path an agent follows** (this is exactly what [`e2e/discovery.spec.ts`](../e2e/discovery.spec.ts) does):
+
+1. It fetches the dashboard's homepage. The HTML already contains a "For AI agents" section with the MCP URL and the `llms.txt` URL ([`HomePage.tsx`](../src/app/HomePage.tsx)), as visible text, because that's what survives whatever HTML-to-text conversion the agent's fetch tool does. There's also a `<link rel="alternate" type="text/markdown" href="/llms.txt">` in the head, but few agents look for it.
+2. It reads [`/llms.txt`](../src/discovery/llmsTxt.ts), which says what Linkly is, recommends MCP, gives the REST base URL and the OpenAPI URL, explains the personal access token fallback, and lists the rules (never ask for the password, ask before anything marked `x-destructive`, keep tokens out of output). It only covers what the OpenAPI document can't say, so endpoints, scopes, and login details aren't repeated there.
+3. It fetches the OpenAPI document and picks an operation.
+4. It calls it without a token and gets a `401`. The `WWW-Authenticate` header leads to the protected-resource metadata and then to the authorization server, the same discovery MCP clients use ([How OAuth works here](#how-oauth-works-here)).
+5. An OAuth client logs in with CIMD and PKCE, using `resource=<server>/api/v1`. Any other agent asks the user for a personal access token from `/settings/tokens`.
+
+The user can skip steps 1 and 2 by handing the agent a URL directly. The Connections page has a "Connect an AI agent" card with the MCP URL and a ready prompt ("Read `<dashboard>/llms.txt` and connect to my Linkly account"), which is the most reliable signal of all, since nothing depends on the agent guessing.
+
+**For code rather than models,** every `/api/v1` response carries `Link: <…/api/v1/openapi.json>; rel="service-desc"` (RFC 8631), the OpenAPI document is also served at `/.well-known/openapi.json` (same handler, no agreed standard behind the path), and `/.well-known/api-catalog` (RFC 9727) lists it. Models rarely see response headers, so these mostly help tools and crawlers.
+
+**Why `llms.txt` is built ahead of time and the pages are prerendered.** Wasp serves the dashboard (static files) and the API server from different addresses, and agents start from the dashboard's. Without prerendering, every dashboard route returns the same empty page shell until JavaScript runs, so an agent fetching the homepage would see nothing to follow. So the homepage, the docs index, and every doc page are prerendered (`prerender` on their routes), and a small Vite plugin in [`vite.config.ts`](../vite.config.ts) writes `llms.txt` into the client build, reading the API address from the same `REACT_APP_API_URL` the build already needs. Everything in `llms.txt` is fixed per deploy, so building it means it lives on the dashboard's own site with no proxy or rewrite, and it can't go stale. Only content that changes without a deploy would need a server route. Prerendered pages have no `window`, so dashboard links on them are root-relative until the page hydrates ([`useOrigin`](../src/app/useOrigin.ts)).
+
+**What an agent on REST misses compared with MCP.** It gets the same operations, scopes, consent screen, and error messages, but not the things MCP clients act on for the user: `readOnlyHint` and `destructiveHint` (REST only has the custom `x-destructive`, which the agent has to read and respect itself), tool descriptions written for the model and delivered on connect, a tool list trimmed to what the user granted, and the confirm page opening by itself. And an agent using a personal access token holds a long-lived secret in its own context, where it could send it anywhere, while an MCP client app keeps its OAuth token away from the model. That's why `llms.txt` still recommends MCP first.
+
+**In production, serve the dashboard and the API from one domain** if you can, with a reverse proxy sending the API server's paths (`/api/v1`, `/mcp`, `/oauth`, `/.well-known`, `/r`, and Wasp's own `/auth` and `/operations`) to the server and everything else to the static files. Then "linkly.example.com" is the address of everything, and agents that guess `/.well-known/openapi.json` on the address they were given find it. `llms.txt` works either way, because it carries absolute API URLs.
+
 ## Testing strategy
 
-Wasp runs client tests only, so tests come in three kinds:
+Wasp runs client tests only, so tests come in four kinds:
 
 - **Server unit tests** (`npm test`, [`vitest.config.ts`](../vitest.config.ts)): services, OAuth logic, the MCP registry and server (a real SDK client calling the handler in process, over both protocol eras), parity and lint tests, against a real Postgres test database. This works because services never import Wasp.
 - **Live-server tests** (`npm run test:e2e`, [`playwright.config.ts`](../playwright.config.ts)): Playwright starts `wasp start` on the test database and runs browser flows, REST, MCP SDK clients over Streamable HTTP (v1 as a 2025-era client, v2 for 2026-07-28 and URL-mode elicitation), the complete OAuth flow headless (a local [test client](../e2e/fixtures/testClient.ts) serves its CIMD document and catches the redirect), and the CLI as a subprocess.
+- **Build checks** (`npm run test:build`, [`vitest.build.config.ts`](../vitest.build.config.ts)): run `wasp build` and a client build with a set `REACT_APP_API_URL`, then check that `llms.txt` has that address and that the homepage and every doc page were prerendered. They write to `.wasp/out`, so don't run them while `wasp start` is running.
 - **Manual checks** that can't be automated, and their results, are listed in [`NOTES.md`](../NOTES.md#manual-checks-still-to-do).

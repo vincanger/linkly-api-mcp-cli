@@ -1,0 +1,1116 @@
+{
+  "schemaVersion": 1,
+  "id": "plan_fq6hj1kd",
+  "name": "linkly",
+  "app": {
+    "name": "linkly",
+    "auth": {
+      "userEntity": "User",
+      "methods": [
+        "usernameAndPassword"
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "entity_oc67n123",
+      "kind": "entity",
+      "name": "User",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        }
+      ]
+    },
+    {
+      "id": "entity_rctzk3x7",
+      "kind": "entity",
+      "name": "Link",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        },
+        {
+          "name": "slug",
+          "type": "String",
+          "attributes": "@unique"
+        },
+        {
+          "name": "destinationUrl",
+          "type": "String"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "tags",
+          "type": "String",
+          "list": true,
+          "attributes": "@default([])"
+        },
+        {
+          "name": "archived",
+          "type": "Boolean",
+          "attributes": "@default(false)"
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "attributes": "@updatedAt"
+        }
+      ]
+    },
+    {
+      "id": "entity_aiivxgih",
+      "kind": "entity",
+      "name": "Click",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())"
+        },
+        {
+          "name": "referrer",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "userAgent",
+          "type": "String",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "entity_inkguzrm",
+      "kind": "entity",
+      "name": "Grant",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        },
+        {
+          "name": "clientId",
+          "type": "String"
+        },
+        {
+          "name": "clientName",
+          "type": "String"
+        },
+        {
+          "name": "scopes",
+          "type": "String",
+          "list": true
+        },
+        {
+          "name": "requestedScopes",
+          "type": "String",
+          "list": true
+        },
+        {
+          "name": "confirmDestructive",
+          "type": "Boolean",
+          "attributes": "@default(true)"
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())"
+        },
+        {
+          "name": "revokedAt",
+          "type": "DateTime",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "entity_gsjwmx9v",
+      "kind": "entity",
+      "name": "AccessToken",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        },
+        {
+          "name": "tokenHash",
+          "type": "String",
+          "attributes": "@unique"
+        },
+        {
+          "name": "kind",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "scopes",
+          "type": "String",
+          "list": true
+        },
+        {
+          "name": "audience",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "revokedAt",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "lastUsedAt",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())"
+        }
+      ]
+    },
+    {
+      "id": "entity_2ex8197s",
+      "kind": "entity",
+      "name": "RefreshToken",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        },
+        {
+          "name": "tokenHash",
+          "type": "String",
+          "attributes": "@unique"
+        },
+        {
+          "name": "resource",
+          "type": "String"
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "usedAt",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())"
+        }
+      ]
+    },
+    {
+      "id": "entity_emhfdm0s",
+      "kind": "entity",
+      "name": "AuthorizationCode",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        },
+        {
+          "name": "codeHash",
+          "type": "String",
+          "attributes": "@unique"
+        },
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "clientId",
+          "type": "String"
+        },
+        {
+          "name": "redirectUri",
+          "type": "String"
+        },
+        {
+          "name": "codeChallenge",
+          "type": "String"
+        },
+        {
+          "name": "scopes",
+          "type": "String",
+          "list": true
+        },
+        {
+          "name": "requestedScopes",
+          "type": "String",
+          "list": true
+        },
+        {
+          "name": "resource",
+          "type": "String"
+        },
+        {
+          "name": "confirmDestructive",
+          "type": "Boolean"
+        },
+        {
+          "name": "grantId",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "usedAt",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())"
+        }
+      ]
+    },
+    {
+      "id": "entity_t76mhnkd",
+      "kind": "entity",
+      "name": "OAuthClientCache",
+      "fields": [
+        {
+          "name": "clientId",
+          "type": "String",
+          "attributes": "@id"
+        },
+        {
+          "name": "metadata",
+          "type": "Json"
+        },
+        {
+          "name": "fetchedAt",
+          "type": "DateTime"
+        }
+      ]
+    },
+    {
+      "id": "entity_h0vhmbe2",
+      "kind": "entity",
+      "name": "PendingAction",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "attributes": "@id @default(uuid())"
+        },
+        {
+          "name": "type",
+          "type": "String"
+        },
+        {
+          "name": "payload",
+          "type": "Json"
+        },
+        {
+          "name": "requestedBy",
+          "type": "String"
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "completedAt",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "cancelledAt",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "attributes": "@default(now())"
+        }
+      ]
+    },
+    {
+      "id": "page_4bx9neqy",
+      "kind": "page",
+      "name": "TokensPage",
+      "path": "/settings/tokens",
+      "authRequired": true
+    },
+    {
+      "id": "page_g5x17zrz",
+      "kind": "page",
+      "name": "ConsentPage",
+      "path": "/oauth/authorize"
+    },
+    {
+      "id": "page_mjxi6jmw",
+      "kind": "page",
+      "name": "ConnectionsPage",
+      "path": "/settings/connections",
+      "authRequired": true
+    },
+    {
+      "id": "page_6asepav7",
+      "kind": "page",
+      "name": "LinksPage",
+      "path": "/links",
+      "authRequired": true
+    },
+    {
+      "id": "page_p87oesmp",
+      "kind": "page",
+      "name": "NewLinkPage",
+      "path": "/links/new",
+      "authRequired": true
+    },
+    {
+      "id": "page_b8fexd8o",
+      "kind": "page",
+      "name": "LinkDetailPage",
+      "path": "/links/:id",
+      "authRequired": true
+    },
+    {
+      "id": "page_dqieribd",
+      "kind": "page",
+      "name": "DocsIndexPage",
+      "path": "/docs"
+    },
+    {
+      "id": "page_qd1rd9bh",
+      "kind": "page",
+      "name": "DocPage",
+      "path": "/docs/:slug"
+    },
+    {
+      "id": "page_pjq6a0lw",
+      "kind": "page",
+      "name": "ConfirmActionPage",
+      "path": "/confirm/:actionId"
+    },
+    {
+      "id": "page_z8arp6xg",
+      "kind": "page",
+      "name": "HomePage",
+      "path": "/"
+    },
+    {
+      "id": "page_bjdkshlj",
+      "kind": "page",
+      "name": "LoginPage",
+      "path": "/login"
+    },
+    {
+      "id": "page_vykuajvk",
+      "kind": "page",
+      "name": "SignupPage",
+      "path": "/signup"
+    },
+    {
+      "id": "page_piu1af7n",
+      "kind": "page",
+      "name": "TopLinksPage",
+      "path": "/analytics",
+      "authRequired": true
+    },
+    {
+      "id": "query_qm69ko5s",
+      "kind": "query",
+      "name": "getPats"
+    },
+    {
+      "id": "query_t2d0unyi",
+      "kind": "query",
+      "name": "getAuthorizeRequest"
+    },
+    {
+      "id": "query_xfykdwoc",
+      "kind": "query",
+      "name": "getGrants"
+    },
+    {
+      "id": "query_bbn1qzt5",
+      "kind": "query",
+      "name": "getLinks"
+    },
+    {
+      "id": "query_5xaihreo",
+      "kind": "query",
+      "name": "getLink"
+    },
+    {
+      "id": "query_hsfaqatb",
+      "kind": "query",
+      "name": "getPendingAction"
+    },
+    {
+      "id": "query_mgxl76a7",
+      "kind": "query",
+      "name": "getLinkStats"
+    },
+    {
+      "id": "query_djqc8cs9",
+      "kind": "query",
+      "name": "getTopLinks"
+    },
+    {
+      "id": "action_hx8hgk82",
+      "kind": "action",
+      "name": "createPat"
+    },
+    {
+      "id": "action_8bc2z4a2",
+      "kind": "action",
+      "name": "revokePat"
+    },
+    {
+      "id": "action_zfeb8g25",
+      "kind": "action",
+      "name": "approveAuthorization"
+    },
+    {
+      "id": "action_kjfdb0ko",
+      "kind": "action",
+      "name": "denyAuthorization"
+    },
+    {
+      "id": "action_kom2tgp9",
+      "kind": "action",
+      "name": "updateGrant"
+    },
+    {
+      "id": "action_4yoqthoj",
+      "kind": "action",
+      "name": "revokeGrant"
+    },
+    {
+      "id": "action_k4lo0qvc",
+      "kind": "action",
+      "name": "createLink"
+    },
+    {
+      "id": "action_imt4rtnh",
+      "kind": "action",
+      "name": "updateLink"
+    },
+    {
+      "id": "action_9r4yqa11",
+      "kind": "action",
+      "name": "deleteLink"
+    },
+    {
+      "id": "action_u2phfuws",
+      "kind": "action",
+      "name": "confirmPendingAction"
+    },
+    {
+      "id": "action_65qvogxn",
+      "kind": "action",
+      "name": "cancelPendingAction"
+    },
+    {
+      "id": "api_jjwllyuw",
+      "kind": "api",
+      "name": "createTestUser",
+      "method": "POST",
+      "path": "/__test/users"
+    },
+    {
+      "id": "api_1qqjftsa",
+      "kind": "api",
+      "name": "restOpenApi",
+      "method": "GET",
+      "path": "/api/v1/openapi.json"
+    },
+    {
+      "id": "api_ppb9e7nk",
+      "kind": "api",
+      "name": "wellKnownProtectedResource",
+      "method": "GET",
+      "path": "/.well-known/oauth-protected-resource"
+    },
+    {
+      "id": "api_63o4t8rn",
+      "kind": "api",
+      "name": "wellKnownProtectedResourceMcp",
+      "method": "GET",
+      "path": "/.well-known/oauth-protected-resource/mcp"
+    },
+    {
+      "id": "api_xu2ldj2q",
+      "kind": "api",
+      "name": "wellKnownProtectedResourceApi",
+      "method": "GET",
+      "path": "/.well-known/oauth-protected-resource/api/v1"
+    },
+    {
+      "id": "api_3026be42",
+      "kind": "api",
+      "name": "wellKnownAuthorizationServer",
+      "method": "GET",
+      "path": "/.well-known/oauth-authorization-server"
+    },
+    {
+      "id": "api_0zvt11si",
+      "kind": "api",
+      "name": "oauthToken",
+      "method": "POST",
+      "path": "/oauth/token"
+    },
+    {
+      "id": "api_cxf8zam1",
+      "kind": "api",
+      "name": "oauthRevoke",
+      "method": "POST",
+      "path": "/oauth/revoke"
+    },
+    {
+      "id": "api_fzp5jtjh",
+      "kind": "api",
+      "name": "mcp",
+      "method": "ALL",
+      "path": "/mcp"
+    },
+    {
+      "id": "api_nobfyily",
+      "kind": "api",
+      "name": "restLinks",
+      "method": "ALL",
+      "path": "/api/v1/links"
+    },
+    {
+      "id": "api_bmivoeiw",
+      "kind": "api",
+      "name": "restLink",
+      "method": "ALL",
+      "path": "/api/v1/links/:id"
+    },
+    {
+      "id": "api_rh6srqho",
+      "kind": "api",
+      "name": "restDocSearch",
+      "method": "GET",
+      "path": "/api/v1/docs/search"
+    },
+    {
+      "id": "api_iqq7hgpl",
+      "kind": "api",
+      "name": "restDoc",
+      "method": "GET",
+      "path": "/api/v1/docs/:slug"
+    },
+    {
+      "id": "api_qyjlv8hk",
+      "kind": "api",
+      "name": "redirect",
+      "method": "GET",
+      "path": "/r/:slug"
+    },
+    {
+      "id": "api_5ecmpksg",
+      "kind": "api",
+      "name": "restLinkStats",
+      "method": "GET",
+      "path": "/api/v1/links/:id/stats"
+    },
+    {
+      "id": "api_l7dq2fwk",
+      "kind": "api",
+      "name": "restTopLinks",
+      "method": "GET",
+      "path": "/api/v1/analytics/top-links"
+    },
+    {
+      "id": "api_zjcix2l1",
+      "kind": "api",
+      "name": "restMe",
+      "method": "GET",
+      "path": "/api/v1/me"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_jqxj62am",
+      "kind": "relation",
+      "source": "entity_oc67n123",
+      "target": "entity_rctzk3x7",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "edge_3ufr8q0c",
+      "kind": "relation",
+      "source": "entity_oc67n123",
+      "target": "entity_inkguzrm",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "edge_ss1hhdac",
+      "kind": "relation",
+      "source": "entity_oc67n123",
+      "target": "entity_gsjwmx9v",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "edge_m363s3ip",
+      "kind": "relation",
+      "source": "entity_oc67n123",
+      "target": "entity_h0vhmbe2",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "edge_mioakpec",
+      "kind": "relation",
+      "source": "entity_rctzk3x7",
+      "target": "entity_aiivxgih",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "edge_cb2iylym",
+      "kind": "relation",
+      "source": "entity_inkguzrm",
+      "target": "entity_gsjwmx9v",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "edge_ukn3fgsi",
+      "kind": "relation",
+      "source": "entity_inkguzrm",
+      "target": "entity_2ex8197s",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "edge_n7ah01o7",
+      "kind": "uses",
+      "source": "query_qm69ko5s",
+      "target": "entity_gsjwmx9v"
+    },
+    {
+      "id": "edge_zww5czjh",
+      "kind": "uses",
+      "source": "query_t2d0unyi",
+      "target": "entity_t76mhnkd"
+    },
+    {
+      "id": "edge_ywhvzgnp",
+      "kind": "uses",
+      "source": "query_xfykdwoc",
+      "target": "entity_inkguzrm"
+    },
+    {
+      "id": "edge_7yypba5l",
+      "kind": "uses",
+      "source": "query_xfykdwoc",
+      "target": "entity_gsjwmx9v"
+    },
+    {
+      "id": "edge_zs8d3f0p",
+      "kind": "uses",
+      "source": "query_bbn1qzt5",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_b78g4kkc",
+      "kind": "uses",
+      "source": "query_5xaihreo",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_xauign4z",
+      "kind": "uses",
+      "source": "query_hsfaqatb",
+      "target": "entity_h0vhmbe2"
+    },
+    {
+      "id": "edge_oiwvsfll",
+      "kind": "uses",
+      "source": "query_mgxl76a7",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_kldnghu9",
+      "kind": "uses",
+      "source": "query_mgxl76a7",
+      "target": "entity_aiivxgih"
+    },
+    {
+      "id": "edge_in93xm5s",
+      "kind": "uses",
+      "source": "query_djqc8cs9",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_hm6ha6s1",
+      "kind": "uses",
+      "source": "query_djqc8cs9",
+      "target": "entity_aiivxgih"
+    },
+    {
+      "id": "edge_xjdfvc23",
+      "kind": "uses",
+      "source": "action_hx8hgk82",
+      "target": "entity_gsjwmx9v"
+    },
+    {
+      "id": "edge_j5jpjvrt",
+      "kind": "uses",
+      "source": "action_8bc2z4a2",
+      "target": "entity_gsjwmx9v"
+    },
+    {
+      "id": "edge_mnnb0du5",
+      "kind": "uses",
+      "source": "action_zfeb8g25",
+      "target": "entity_emhfdm0s"
+    },
+    {
+      "id": "edge_wfgqvnjs",
+      "kind": "uses",
+      "source": "action_zfeb8g25",
+      "target": "entity_t76mhnkd"
+    },
+    {
+      "id": "edge_m1770i4s",
+      "kind": "uses",
+      "source": "action_kjfdb0ko",
+      "target": "entity_t76mhnkd"
+    },
+    {
+      "id": "edge_akffis4k",
+      "kind": "uses",
+      "source": "action_kom2tgp9",
+      "target": "entity_inkguzrm"
+    },
+    {
+      "id": "edge_ioql859c",
+      "kind": "uses",
+      "source": "action_4yoqthoj",
+      "target": "entity_inkguzrm"
+    },
+    {
+      "id": "edge_s51tesdd",
+      "kind": "uses",
+      "source": "action_4yoqthoj",
+      "target": "entity_gsjwmx9v"
+    },
+    {
+      "id": "edge_gf686f1d",
+      "kind": "uses",
+      "source": "action_k4lo0qvc",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_y4nx8gpf",
+      "kind": "uses",
+      "source": "action_imt4rtnh",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_yi4ej9yk",
+      "kind": "uses",
+      "source": "action_9r4yqa11",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_77en81qz",
+      "kind": "uses",
+      "source": "action_u2phfuws",
+      "target": "entity_h0vhmbe2"
+    },
+    {
+      "id": "edge_xte1qi1m",
+      "kind": "uses",
+      "source": "action_u2phfuws",
+      "target": "entity_rctzk3x7"
+    },
+    {
+      "id": "edge_jlgr96t5",
+      "kind": "uses",
+      "source": "action_65qvogxn",
+      "target": "entity_h0vhmbe2"
+    }
+  ],
+  "flows": [],
+  "layout": {
+    "data": {
+      "entity_gsjwmx9v": {
+        "x": 650,
+        "y": 233
+      }
+    },
+    "architecture": {
+      "entity_oc67n123": {
+        "x": 20,
+        "y": 2438
+      },
+      "entity_rctzk3x7": {
+        "x": 350,
+        "y": 2111
+      },
+      "entity_aiivxgih": {
+        "x": 680,
+        "y": 1621
+      },
+      "entity_inkguzrm": {
+        "x": 350,
+        "y": 2551
+      },
+      "entity_gsjwmx9v": {
+        "x": 680,
+        "y": 2428
+      },
+      "entity_2ex8197s": {
+        "x": 680,
+        "y": 2637
+      },
+      "entity_emhfdm0s": {
+        "x": 350,
+        "y": 20
+      },
+      "entity_t76mhnkd": {
+        "x": 350,
+        "y": 1174
+      },
+      "entity_h0vhmbe2": {
+        "x": 350,
+        "y": 1767
+      },
+      "page_4bx9neqy": {
+        "x": 20,
+        "y": 106
+      },
+      "page_g5x17zrz": {
+        "x": 20,
+        "y": 192
+      },
+      "page_mjxi6jmw": {
+        "x": 20,
+        "y": 278
+      },
+      "page_6asepav7": {
+        "x": 20,
+        "y": 364
+      },
+      "page_p87oesmp": {
+        "x": 20,
+        "y": 450
+      },
+      "page_b8fexd8o": {
+        "x": 20,
+        "y": 536
+      },
+      "page_dqieribd": {
+        "x": 20,
+        "y": 622
+      },
+      "page_qd1rd9bh": {
+        "x": 20,
+        "y": 708
+      },
+      "page_pjq6a0lw": {
+        "x": 20,
+        "y": 794
+      },
+      "page_z8arp6xg": {
+        "x": 20,
+        "y": 880
+      },
+      "page_bjdkshlj": {
+        "x": 20,
+        "y": 966
+      },
+      "page_vykuajvk": {
+        "x": 20,
+        "y": 1052
+      },
+      "page_piu1af7n": {
+        "x": 20,
+        "y": 1138
+      },
+      "query_qm69ko5s": {
+        "x": 350,
+        "y": 1853
+      },
+      "query_t2d0unyi": {
+        "x": 20,
+        "y": 1310
+      },
+      "query_xfykdwoc": {
+        "x": 20,
+        "y": 2620
+      },
+      "query_bbn1qzt5": {
+        "x": 20,
+        "y": 2352
+      },
+      "query_5xaihreo": {
+        "x": 20,
+        "y": 2266
+      },
+      "query_hsfaqatb": {
+        "x": 20,
+        "y": 1568
+      },
+      "query_mgxl76a7": {
+        "x": 20,
+        "y": 1654
+      },
+      "query_djqc8cs9": {
+        "x": 20,
+        "y": 1482
+      },
+      "action_hx8hgk82": {
+        "x": 350,
+        "y": 1939
+      },
+      "action_8bc2z4a2": {
+        "x": 350,
+        "y": 2025
+      },
+      "action_zfeb8g25": {
+        "x": 20,
+        "y": 20
+      },
+      "action_kjfdb0ko": {
+        "x": 20,
+        "y": 1224
+      },
+      "action_kom2tgp9": {
+        "x": 20,
+        "y": 2706
+      },
+      "action_4yoqthoj": {
+        "x": 20,
+        "y": 2524
+      },
+      "action_k4lo0qvc": {
+        "x": 20,
+        "y": 2180
+      },
+      "action_imt4rtnh": {
+        "x": 20,
+        "y": 2094
+      },
+      "action_9r4yqa11": {
+        "x": 20,
+        "y": 1922
+      },
+      "action_u2phfuws": {
+        "x": 20,
+        "y": 1740
+      },
+      "action_65qvogxn": {
+        "x": 20,
+        "y": 1396
+      },
+      "api_jjwllyuw": {
+        "x": 20,
+        "y": 2792
+      },
+      "api_1qqjftsa": {
+        "x": 20,
+        "y": 2878
+      },
+      "api_ppb9e7nk": {
+        "x": 20,
+        "y": 2964
+      },
+      "api_63o4t8rn": {
+        "x": 20,
+        "y": 3050
+      },
+      "api_xu2ldj2q": {
+        "x": 20,
+        "y": 3136
+      },
+      "api_3026be42": {
+        "x": 20,
+        "y": 3222
+      },
+      "api_0zvt11si": {
+        "x": 20,
+        "y": 3308
+      },
+      "api_cxf8zam1": {
+        "x": 20,
+        "y": 3394
+      },
+      "api_fzp5jtjh": {
+        "x": 20,
+        "y": 3480
+      },
+      "api_nobfyily": {
+        "x": 20,
+        "y": 3566
+      },
+      "api_bmivoeiw": {
+        "x": 20,
+        "y": 3652
+      },
+      "api_rh6srqho": {
+        "x": 20,
+        "y": 3738
+      },
+      "api_iqq7hgpl": {
+        "x": 20,
+        "y": 3824
+      },
+      "api_qyjlv8hk": {
+        "x": 20,
+        "y": 3910
+      },
+      "api_5ecmpksg": {
+        "x": 20,
+        "y": 3996
+      },
+      "api_l7dq2fwk": {
+        "x": 20,
+        "y": 4082
+      },
+      "api_zjcix2l1": {
+        "x": 20,
+        "y": 4168
+      }
+    }
+  },
+  "revision": 5,
+  "createdAt": "2026-10-06T19:31:46.895Z",
+  "updatedAt": "2026-10-06T19:34:56.545Z"
+}

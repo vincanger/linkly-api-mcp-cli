@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { config } from "wasp/client";
 import { getGrants, revokeGrant, updateGrant, useQuery } from "wasp/client/operations";
+import { CopyField } from "../../app/ui/CopyField";
 import { errorMessage } from "../../app/ui/errors";
 import {
   AlertDialog,
@@ -14,8 +16,10 @@ import {
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
 import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Switch } from "../../components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { LLMS_TXT_PATH, MCP_PATH } from "../../discovery/paths";
 import type { Scope } from "../../shared/scopes";
 import type { GrantOut } from "../grants";
 import { ScopeChecklist } from "./ScopeChecklist";
@@ -33,6 +37,7 @@ export function ConnectionsPage() {
         </p>
       </div>
       {error && <p className="text-destructive">{errorMessage(error)}</p>}
+      <ConnectAgentCard />
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
@@ -60,6 +65,31 @@ export function ConnectionsPage() {
         </Table>
       </div>
     </div>
+  );
+}
+
+/**
+ * What to hand an AI agent. A URL the user gives the agent is the most reliable
+ * way in, because nothing depends on the agent guessing where to look.
+ */
+function ConnectAgentCard() {
+  const mcpUrl = config.apiUrl + MCP_PATH;
+  const prompt = `Read ${window.location.origin}${LLMS_TXT_PATH} and connect to my Linkly account.`;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Connect an AI agent</CardTitle>
+        <CardDescription>
+          Add the MCP server URL to an assistant that supports MCP. For any other agent, paste the prompt: it tells the
+          agent where to read how to connect. The agent never gets your password: you approve it in your browser, or
+          create a token for it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <CopyField label="MCP server URL" value={mcpUrl} testId="connect-mcp-url" />
+        <CopyField label="Prompt for your agent" value={prompt} testId="connect-prompt" />
+      </CardContent>
+    </Card>
   );
 }
 

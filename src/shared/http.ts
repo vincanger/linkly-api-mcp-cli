@@ -3,6 +3,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import type { MiddlewareConfigFn } from "wasp/server";
 import { prisma } from "wasp/server";
+import { OPENAPI_PATH } from "../discovery/paths";
 import { authenticateBearer, type BearerTarget } from "./bearer";
 import { toErrorResponse, toHttpResponse } from "./errors";
 import type { Principal } from "./principal";
@@ -34,7 +35,17 @@ const withPermissiveCors: MiddlewareConfigFn = (config) => {
   return config;
 };
 
-export const restMiddleware: MiddlewareConfigFn = withPermissiveCors;
+/** RFC 8631: every /api/v1 response points at the machine-readable API description. */
+export const serviceDescLink: RequestHandler = (_req, res, next) => {
+  res.setHeader("Link", `<${serverUrl()}${OPENAPI_PATH}>; rel="service-desc"`);
+  next();
+};
+
+export const restMiddleware: MiddlewareConfigFn = (config) => {
+  withPermissiveCors(config);
+  config.set("serviceDesc", serviceDescLink);
+  return config;
+};
 export const mcpMiddleware: MiddlewareConfigFn = withPermissiveCors;
 export const oauthMiddleware: MiddlewareConfigFn = withPermissiveCors;
 export const wellKnownMiddleware: MiddlewareConfigFn = withPermissiveCors;

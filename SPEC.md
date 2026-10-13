@@ -893,6 +893,7 @@ New slice `src/discovery/`. It adds metadata and build output only: no new busin
    - Already built in M4, keep as is: `401` with `WWW-Authenticate: Bearer resource_metadata="..."` on `/api/v1`, and `/.well-known/oauth-protected-resource/api/v1`.
    - Add a `Link: </api/v1/openapi.json>; rel="service-desc"` header (RFC 8631) to `/api/v1` responses. `service-desc` means "machine-readable API description", so it points at the OpenAPI document, never at `llms.txt`.
    - Serve the OpenAPI document at `GET /.well-known/openapi.json` too, for agents that look there first: the same handler as `/api/v1/openapi.json`, not a copy.
+   - **As built:** also `GET /.well-known/api-catalog` (RFC 9727), the registered well-known path for API discovery: a linkset pointing at the OpenAPI document, the REST docs page, and `llms.txt`.
    - **No `SKILL.md`.** A skill only adds value over `llms.txt` when agents install it, and skill installers install from git repos, not from a `/.well-known` URL. An installable skill for the `linkly` CLI would be its own milestone.
 
 5. **Docs.** Add a "Discovery without MCP" section to `docs/ARCHITECTURE.md`. It covers:
