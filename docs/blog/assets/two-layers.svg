@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 900 492" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="900" height="492" viewBox="0 0 900 492" role="img" aria-labelledby="t d">
   <title id="t">Two layers: surfaces and operations</title>
   <desc id="d">Four callers, the dashboard, an MCP server, a REST API and a CLI, each send a request. The dashboard, MCP and REST each pass through a one-line adapter; the CLI uses the REST API. All four land on the same createLink operation, where the permission check, validation and business rules live, and the same result goes back to each caller.</desc>
   <style>

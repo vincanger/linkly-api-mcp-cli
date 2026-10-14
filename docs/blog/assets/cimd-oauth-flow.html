@@ -1,10 +1,35 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>How Claude Code Connects</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How an MCP Client Logs In</title>
+<!--
+  Step-through walkthrough of an MCP client logging in with CIMD OAuth.
+
+  Standalone: open the file as is.
+  Embedded:   ?embed=1 hides the intro and the step list, drops the page
+              background, and stops rewriting the URL hash.
+  Options:    ?theme=light|dark  forces a theme (default: follows the OS)
+              ?step=N            opens on step N
+  Messages:   posts {type: "cimd-oauth-flow:height", height} to the parent
+              whenever its height changes, and accepts
+              {type: "cimd-oauth-flow:theme", theme: "light"|"dark"}.
+-->
+<script>
+  (() => {
+    const p = new URLSearchParams(location.search);
+    if (p.has("embed")) document.documentElement.classList.add("embed");
+    const t = p.get("theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
   :root {
+    color-scheme: light;
     --bg: #edf0f3;
     --surface: #ffffff;
     --note-bg: #f5f7f9;
@@ -62,10 +87,11 @@
 
   * { box-sizing: border-box; }
   body {
+    margin: 0;
     background: var(--bg);
     color: var(--ink);
     font: 15px/1.55 var(--sans);
-    padding: 28px 20px 56px;
+    padding: 28px 16px 56px;
   }
   .wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
 
@@ -89,9 +115,14 @@
   button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); min-width: 84px; }
   button:disabled { opacity: .4; cursor: default; }
   .dots { display: flex; flex-wrap: wrap; gap: 4px; }
-  .dots button { width: 32px; height: 32px; padding: 0; font: 500 13px/1 var(--mono); border-radius: 50%; }
+  .dots button { width: 32px; height: 32px; padding: 0; font: 500 13px/1 var(--mono); border-radius: 50%; position: relative; }
   .dots button[aria-current="step"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
   .dots button.done { color: var(--muted); }
+  /* CIMD steps get a small mark under their number. */
+  .dots button.cimd::after {
+    content: ""; position: absolute; left: 50%; bottom: -5px; width: 12px; height: 3px; margin-left: -6px;
+    border-radius: 2px; background: var(--ink);
+  }
   .counter { font: 500 13px/1 var(--mono); color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
 
   .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
@@ -102,6 +133,15 @@
   .legend .k-secret i { color: var(--secret); border-top-style: dashed; }
   .legend .k-ticket i { color: var(--ticket); }
   .legend .k-token i { color: var(--token); }
+  .legend .k-cimd i { width: 12px; border-top-width: 3px; border-radius: 2px; color: var(--ink); }
+
+  /* Step chips: which part of the standard each step is. */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font: 500 11px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase;
+    padding: 5px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); background: var(--note-bg);
+  }
+  .chip.cimd { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 
   /* Stage */
   .stage { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; }
@@ -125,6 +165,7 @@
   .pill.k-secret rect { stroke: var(--secret); stroke-dasharray: 3 2; } .pill.k-secret text { fill: var(--secret); }
   .pill.k-ticket rect { stroke: var(--ticket); } .pill.k-ticket text { fill: var(--ticket); }
   .pill.k-token rect { stroke: var(--token); } .pill.k-token text { fill: var(--token); }
+  .pill.k-cimd rect { stroke: var(--ink); } .pill.k-cimd text { fill: var(--ink); }
   .pill.empty text { fill: var(--lane); font-style: italic; }
 
   .lifeline { stroke: var(--lane); stroke-dasharray: 4 5; }
@@ -148,8 +189,9 @@
   .badge circle { fill: var(--ink); } .badge text { fill: var(--surface); font: 600 12px var(--mono); }
 
   /* Explanation panel */
-  .panel { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); padding: 22px; display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+  .panel { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); padding: 22px; display: grid; gap: 14px; position: sticky; top: 16px; }
   @media (max-width: 900px) { .panel { position: static; } }
+  .panel .step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
   .panel .step-no { font: 500 12px/1 var(--mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
   .panel h2 { font: 600 24px/1.15 var(--cond); margin: 0; text-wrap: balance; }
   .panel p { margin: 0; max-width: 62ch; }
@@ -169,26 +211,39 @@
   .all li button {
     width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px;
     padding: 10px 12px 10px 48px; position: relative; font: 400 14.5px/1.5 var(--sans); color: var(--muted);
+    display: grid; gap: 4px;
   }
   .all li button::before {
     content: counter(s); position: absolute; left: 12px; top: 10px; width: 24px; height: 24px; border-radius: 50%;
     display: grid; place-items: center; font: 600 12px/1 var(--mono); background: var(--note-bg); color: var(--ink); border: 1px solid var(--line);
   }
-  .all li button strong { color: var(--ink); font-weight: 600; display: block; }
+  .all li button strong { color: var(--ink); font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .all li button:hover { background: var(--note-bg); }
   .all li button[aria-current="step"] { border-color: var(--line); background: var(--note-bg); }
   .fine { color: var(--muted); font-size: 13.5px; margin: 14px 0 0; max-width: 80ch; }
+
+  /* Embedded in a blog post: the post gives the context, so drop the intro,
+     the step list, and the page background, and always stack the panel
+     under the diagram (blog columns are narrower than the side-by-side layout). */
+  .embed body { background: transparent; padding: 2px 0 6px; }
+  .embed header.intro, .embed section.all { display: none; }
+  .embed .wrap { gap: 12px; }
+  .embed .stage { grid-template-columns: 1fr; gap: 12px; }
+  .embed .panel { position: static; padding: 18px; }
+  .embed .controls, .embed .diagram, .embed .panel { box-shadow: none; border: 1px solid var(--line); }
+  .embed .body-scroll { max-height: 320px; }
 
   @media (prefers-reduced-motion: reduce) {
     .row, .body-scroll { transition: none; scroll-behavior: auto; }
   }
 </style>
-
+</head>
+<body>
 <div class="wrap">
   <header class="intro">
-    <div class="eyebrow">OAuth with a Client ID Metadata Document</div>
-    <h1>How Claude Code logs in to Linkly</h1>
-    <p>You ran <code class="mono">claude mcp add --transport http linkly http://localhost:3001/mcp</code> and clicked Allow. Here's everything that happened, one message at a time. Watch the "What each one knows" row: it shows where the secrets, the one-time code, and the tokens are after every step.</p>
+    <div class="eyebrow">OAuth 2.1 + PKCE, with a Client ID Metadata Document (CIMD)</div>
+    <h1>How an MCP client logs in to Linkly</h1>
+    <p>You ran <code class="mono">claude mcp add --transport http linkly https://myapp.com/mcp</code> and clicked Allow. Here's everything that happened, one message at a time. Most of it is standard OAuth. The steps marked CIMD are the part that lets any client connect without registering first. Watch the "What each one knows" row: it shows where the secrets, the one-time code, and the tokens are after every step.</p>
   </header>
 
   <div class="controls" role="group" aria-label="Playback">
@@ -205,6 +260,7 @@
       <span class="k-secret"><i></i>secret (verifier)</span>
       <span class="k-ticket"><i></i>one-time code</span>
       <span class="k-token"><i></i>tokens</span>
+      <span class="k-cimd"><i></i>CIMD step</span>
     </div>
   </div>
 
@@ -221,7 +277,10 @@
     </div>
 
     <aside class="panel" aria-live="polite">
-      <div class="step-no" id="pStep"></div>
+      <div class="step-head">
+        <div class="step-no" id="pStep"></div>
+        <div class="chips" id="pChips"></div>
+      </div>
       <h2 id="pTitle"></h2>
       <p id="pCaption"></p>
       <p class="why" id="pWhy"></p>
@@ -233,17 +292,20 @@
   <section class="all" aria-labelledby="allTitle">
     <h2 id="allTitle">All nine steps</h2>
     <ol id="allSteps"></ol>
-    <p class="fine">Claude on the web works the same way, with one difference: its callback in step 7 is <code class="mono">claude.ai/api/mcp/auth_callback</code> on Anthropic's servers instead of a temporary server on your laptop, so Anthropic's servers make the step-8 call. Step 5 shows a simplified metadata document; Claude Code's real one may list more fields. Random values like <code class="mono">a81f3c…</code> are examples.</p>
+    <p class="fine">Claude on the web works the same way, with one difference: its callback in step 7 is <code class="mono">claude.ai/api/mcp/auth_callback</code> on Anthropic's servers instead of a temporary server on your laptop, so Anthropic's servers make the step-8 call. The REST API uses the same login, with <code class="mono">resource=https://myapp.com/api/v1</code> in step 4. Step 5 shows a simplified metadata document; Claude Code's real one may list more fields. Random values like <code class="mono">a81f3c…</code> are examples.</p>
   </section>
 </div>
 
 <script>
 (() => {
+  const params = new URLSearchParams(location.search);
+  const EMBED = params.has("embed");
+
   const ACTORS = [
     { id: "cc", name: "Claude Code", sub: "on your laptop" },
     { id: "br", name: "Your browser", sub: "logged in to Linkly" },
     { id: "lk", name: "Linkly", sub: "auth + MCP server" },
-    { id: "ca", name: "claude.ai", sub: "hosts Claude Code's ID card" },
+    { id: "ca", name: "claude.ai", sub: "hosts the CIMD document" },
   ];
   const ITEMS = {
     state: { label: "state", kind: "info" },
@@ -253,19 +315,27 @@
     access: { label: "access token", kind: "token" },
     refresh: { label: "refresh token", kind: "token" },
     grant: { label: "your grant", kind: "info" },
-    doc: { label: "ID card (JSON)", kind: "info" },
+    doc: { label: "CIMD document", kind: "cimd" },
+  };
+  // Which part of the standard each step is. "CIMD" is the part that removes registration.
+  const TAGS = {
+    discovery: { label: "MCP discovery" },
+    oauth: { label: "OAuth" },
+    pkce: { label: "PKCE" },
+    cimd: { label: "CIMD", cimd: true },
   };
 
   const STEPS = [
     {
       title: "Knock without a key",
+      tags: ["discovery"],
       caption: "Claude Code calls Linkly's MCP address with no token. Linkly refuses, but the refusal carries a header that says where to find Linkly's login directions.",
       why: "This is how any MCP client finds the login page on its own. The only thing you gave Claude Code was the /mcp URL.",
-      payload: `POST http://localhost:3001/mcp        (no Authorization header)
+      payload: `POST https://myapp.com/mcp        (no Authorization header)
 
 HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer resource_metadata=
-  "http://localhost:3001/.well-known/oauth-protected-resource/mcp"`,
+  "https://myapp.com/.well-known/oauth-protected-resource/mcp"`,
       items: [
         { t: "msg", from: "cc", to: "lk", label: "POST /mcp", kind: "req" },
         { t: "msg", from: "lk", to: "cc", label: "401 · log in over here", kind: "res" },
@@ -274,12 +344,13 @@ WWW-Authenticate: Bearer resource_metadata=
     },
     {
       title: "Read the directions",
+      tags: ["oauth", "cimd"],
       caption: "Claude Code follows the header and reads Linkly's metadata. It learns where the login page is, where to trade a code for tokens, and that Linkly accepts a URL as the app's ID.",
-      why: "client_id_metadata_document_supported: true means \"no registration needed. Just give me the URL of your ID card.\"",
+      why: "Most of this is standard OAuth metadata. The CIMD part is the last line: client_id_metadata_document_supported: true means \"no registration needed. Just give me the URL of your Client ID Metadata Document.\"",
       payload: `GET /.well-known/oauth-authorization-server
 {
-  "authorization_endpoint": "http://localhost:3000/oauth/authorize",
-  "token_endpoint":         "http://localhost:3001/oauth/token",
+  "authorization_endpoint": "https://myapp.com/oauth/authorize",
+  "token_endpoint":         "https://myapp.com/oauth/token",
   "code_challenge_methods_supported": ["S256"],
   "client_id_metadata_document_supported": true
 }`,
@@ -291,8 +362,9 @@ WWW-Authenticate: Bearer resource_metadata=
     },
     {
       title: "Make two secrets",
+      tags: ["pkce"],
       caption: "Before involving you, Claude Code makes two random values on your laptop and starts a tiny temporary web server to catch the answer later.",
-      why: "The state lets Claude Code recognize its own login when the answer comes back. The verifier stays on your laptop until step 8. Only its hash, the challenge, goes out.",
+      why: "The state lets Claude Code recognize its own login when the answer comes back. The verifier stays on your laptop until step 8. Only its hash, the challenge, goes out. That's PKCE, and every OAuth 2.1 login uses it.",
       payload: `state          = "a81f3c…"   random; sent out and echoed back
 code_verifier  = "Zq9xT…"    random; stays on your laptop
 code_challenge = base64url(SHA-256(code_verifier)) = "K9xH…"
@@ -304,15 +376,16 @@ callback       = http://localhost:52731/callback  (temporary)`,
     },
     {
       title: "Open Linkly's login page",
+      tags: ["oauth", "cimd"],
       caption: "Claude Code opens your browser at Linkly's consent page. Everything Linkly needs is in the URL: who's asking, where to send the answer, the state, and the challenge.",
-      why: "The browser carries this request because you're the one who has to log in and approve. Nothing in this URL is secret: the verifier isn't in it.",
-      payload: `http://localhost:3000/oauth/authorize
-  ?client_id=https://claude.ai/…/client-metadata   ← a URL, not a registered ID
+      why: "The client_id is a URL, not an ID someone registered ahead of time. That's CIMD. Nothing in this URL is secret: the verifier isn't in it.",
+      payload: `https://myapp.com/oauth/authorize
+  ?client_id=https://claude.ai/…/client-metadata   ← a URL (CIMD), not a registered ID
   &redirect_uri=http://localhost:52731/callback
   &state=a81f3c…
   &code_challenge=K9xH…&code_challenge_method=S256
   &response_type=code
-  &resource=http://localhost:3001/mcp`,
+  &resource=https://myapp.com/mcp`,
       items: [
         { t: "msg", from: "cc", to: "br", label: "open login URL", kind: "req" },
         { t: "msg", from: "br", to: "lk", label: "GET /oauth/authorize?…", kind: "req" },
@@ -321,8 +394,9 @@ callback       = http://localhost:52731/callback  (temporary)`,
     },
     {
       title: "Look up who's asking",
-      caption: "Linkly fetches the client_id URL. The JSON there is the app's ID card: its name, and the only addresses it's allowed to receive a code at.",
-      why: "Only claude.ai can put a file on claude.ai, so the domain is what you're really trusting. That's the \"App address\" on the consent screen. Loopback callbacks like localhost may use any port.",
+      tags: ["cimd"],
+      caption: "Linkly fetches the client_id URL. The JSON there is Claude Code's Client ID Metadata Document: its name, and the only addresses it's allowed to receive a code at.",
+      why: "This is the step CIMD adds. Without it, someone would have had to register Claude Code with Linkly ahead of time, or Claude Code would have registered itself with Dynamic Client Registration. Only claude.ai can put a file on claude.ai, so the domain is what you're really trusting. That's the \"App address\" on the consent screen.",
       payload: `GET https://claude.ai/…/client-metadata        (simplified)
 {
   "client_id":     "https://claude.ai/…/client-metadata",
@@ -331,23 +405,27 @@ callback       = http://localhost:52731/callback  (temporary)`,
 }
 
 ✓ client_id equals the URL it was fetched from
-✓ redirect_uri from step 4 is on the list`,
+✓ redirect_uri from step 4 is on the list
+  (localhost callbacks may use any port)`,
       items: [
         { t: "msg", from: "lk", to: "ca", label: "GET client_id URL", kind: "req" },
-        { t: "msg", from: "ca", to: "lk", label: "ID card (JSON)", kind: "res" },
+        { t: "msg", from: "ca", to: "lk", label: "CIMD document (JSON)", kind: "res" },
         { t: "note", on: "lk", lines: ["✓ client_id = its URL", "✓ redirect_uri is listed"] },
       ],
       hold: { cc: ["state", "verifier", "challenge"], br: ["state", "challenge"], lk: ["state", "challenge", "doc"], ca: ["doc"] },
     },
     {
       title: "You approve",
-      caption: "Linkly shows the consent screen. You're logged in to Linkly, so it knows whose account this is. You pick the toolsets and click Allow.",
+      tags: ["oauth"],
+      caption: "Linkly shows the consent screen. You're logged in to Linkly, so it knows whose account this is. You pick what the app may do and click Allow.",
       why: "You are the security check. Linkly keeps no list of approved apps; it asks you, and shows the domain that vouches for the app.",
       payload: `Allow Claude Code to access your Linkly account?
 App address: claude.ai
-Linkly hasn't verified this app.
+Linkly hasn't verified this app. Only continue if you trust claude.ai.
 
-[x] Links        [x] Analytics
+Links      [x] View your links
+           [x] Create, edit, and delete your links
+Analytics  [x] View click analytics
 [on] Require confirmation for destructive actions
 
                                     [Deny]  [Allow]`,
@@ -359,13 +437,14 @@ Linkly hasn't verified this app.
     },
     {
       title: "Get a one-time code",
+      tags: ["oauth"],
       caption: "Linkly sends your browser to the callback address with a one-time code. Your browser lands on Claude Code's temporary server, which checks that the state matches.",
       why: "The code alone is useless to a thief: it expires in 60 seconds, works once, and only counts together with the verifier that only Claude Code has.",
       payload: `302 Found
 Location: http://localhost:52731/callback
   ?code=lk_code_7Hq…     one-time code, valid 60 s
   &state=a81f3c…         same value as step 3
-  &iss=http://localhost:3001`,
+  &iss=https://myapp.com`,
       items: [
         { t: "msg", from: "lk", to: "br", label: "redirect ?code=…", kind: "ticket" },
         { t: "msg", from: "br", to: "cc", label: "/callback?code…", kind: "ticket" },
@@ -375,9 +454,10 @@ Location: http://localhost:52731/callback
     },
     {
       title: "Trade the code for tokens",
+      tags: ["oauth", "pkce"],
       caption: "Claude Code sends the code and the original verifier straight to Linkly, without the browser. Linkly hashes the verifier; if it matches the challenge from step 4, the code is genuine.",
       why: "Someone who grabbed the code from the browser can't do this step: they never saw the verifier. The real credentials only travel in this direct reply.",
-      payload: `POST http://localhost:3001/oauth/token
+      payload: `POST https://myapp.com/oauth/token
 grant_type=authorization_code
 code=lk_code_7Hq…
 code_verifier=Zq9xT…
@@ -397,9 +477,10 @@ client_id=https://claude.ai/…/client-metadata
     },
     {
       title: "Use the tokens",
-      caption: "Every MCP call now carries the access token. Linkly looks up your grant on each request, so changes on the Connections page apply right away.",
+      tags: ["oauth"],
+      caption: "Every MCP call now carries the access token. Linkly looks up your grant on each request, so changes on the Connected apps page apply right away.",
       why: "The access token lasts an hour. When it expires, Claude Code quietly trades the refresh token for a new pair. Revoking the connection in Linkly ends all of it.",
-      payload: `POST http://localhost:3001/mcp
+      payload: `POST https://myapp.com/mcp
 Authorization: Bearer lk_at_…
 {"jsonrpc":"2.0","method":"tools/list","id":1}
 
@@ -413,6 +494,19 @@ Authorization: Bearer lk_at_…
       hold: { cc: ["access", "refresh"], br: [], lk: ["grant"], ca: ["doc"] },
     },
   ];
+
+  const isCimd = (s) => s.tags.some((t) => TAGS[t].cimd);
+  function chips(tags) {
+    const wrap = document.createElement("span");
+    wrap.className = "chips";
+    for (const t of tags) {
+      const c = document.createElement("span");
+      c.className = `chip${TAGS[t].cimd ? " cimd" : ""}`;
+      c.textContent = TAGS[t].label;
+      wrap.appendChild(c);
+    }
+    return wrap;
+  }
 
   // ── Geometry ─────────────────────────────────────────────────────────
   const W = 780;
@@ -478,7 +572,7 @@ Authorization: Bearer lk_at_…
   const lifelines = el("g", {}, body);
   const rowsLayer = el("g", {}, body);
 
-  const rows = []; // { step, g, kind, parts }
+  const rows = [];
   const stepEnd = [];
   let y = TOP;
   STEPS.forEach((step, si) => {
@@ -531,16 +625,19 @@ Authorization: Bearer lk_at_…
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = String(i + 1);
-    b.setAttribute("aria-label", `Step ${i + 1}: ${s.title}`);
+    b.setAttribute("aria-label", `Step ${i + 1}: ${s.title}${isCimd(s) ? " (CIMD)" : ""}`);
+    if (isCimd(s)) b.classList.add("cimd");
     b.addEventListener("click", () => { stopPlay(); go(i); });
     dots.appendChild(b);
 
     const li = document.createElement("li");
     const lb = document.createElement("button");
     lb.type = "button";
-    lb.innerHTML = `<strong></strong><span></span>`;
-    lb.querySelector("strong").textContent = s.title;
-    lb.querySelector("span").textContent = s.caption;
+    const strong = document.createElement("strong");
+    strong.append(document.createTextNode(s.title), chips(s.tags));
+    const span = document.createElement("span");
+    span.textContent = s.caption;
+    lb.append(strong, span);
     lb.addEventListener("click", () => {
       stopPlay();
       go(i);
@@ -572,9 +669,7 @@ Authorization: Bearer lk_at_…
     for (const r of rows) {
       r.g.classList.toggle("past", r.step < index);
       r.g.classList.toggle("future", r.step > index);
-      if (r.type === "msg") {
-        r.packet.setAttribute("opacity", 0);
-      }
+      if (r.type === "msg") r.packet.setAttribute("opacity", 0);
     }
     const h = stepEnd[index] + 8;
     body.setAttribute("viewBox", `0 0 ${W} ${h}`);
@@ -614,6 +709,7 @@ Authorization: Bearer lk_at_…
     // Panel
     const s = STEPS[index];
     $("pStep").textContent = `Step ${index + 1} of ${STEPS.length}`;
+    $("pChips").replaceChildren(...chips(s.tags).childNodes);
     $("pTitle").textContent = s.title;
     $("pCaption").textContent = s.caption;
     $("pWhy").innerHTML = "<strong>Why: </strong>";
@@ -635,7 +731,10 @@ Authorization: Bearer lk_at_…
       bodyScroll.scrollTo({ top: bodyScroll.scrollHeight, behavior: doAnimate ? "smooth" : "auto" });
     });
 
-    try { history.replaceState(null, "", `#step-${index + 1}`); } catch { /* sandboxed: ignore */ }
+    // Standalone only: embedded, the hash belongs to the page around the iframe.
+    if (!EMBED) {
+      try { history.replaceState(null, "", `${location.search}#step-${index + 1}`); } catch { /* sandboxed: ignore */ }
+    }
 
     if (playing) {
       const readTime = 4200 + s.caption.length * 18;
@@ -661,6 +760,7 @@ Authorization: Bearer lk_at_…
   $("play").addEventListener("click", () => (playing ? stopPlay() : startPlay()));
   $("next").addEventListener("click", () => { stopPlay(); go(current + 1); });
   $("prev").addEventListener("click", () => { stopPlay(); go(current - 1, { animate: false }); });
+  // Inside an iframe this only fires while the reader is interacting with the walkthrough.
   document.addEventListener("keydown", (e) => {
     if (e.target instanceof HTMLElement && e.target.closest("input, textarea")) return;
     if (e.key === "ArrowRight") { stopPlay(); go(current + 1); }
@@ -668,9 +768,30 @@ Authorization: Bearer lk_at_…
     else if (e.key === " " && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); playing ? stopPlay() : startPlay(); }
   });
 
+  // ── Embedding: theme from the parent page, height back to it ──────────
+  window.addEventListener("message", (e) => {
+    const d = e.data;
+    if (d && d.type === "cimd-oauth-flow:theme" && (d.theme === "light" || d.theme === "dark")) {
+      document.documentElement.dataset.theme = d.theme;
+    }
+  });
+  if (window.parent !== window) {
+    let lastHeight = 0;
+    const report = () => {
+      const height = Math.ceil(document.documentElement.getBoundingClientRect().height);
+      if (height === lastHeight) return;
+      lastHeight = height;
+      window.parent.postMessage({ type: "cimd-oauth-flow:height", height }, "*");
+    };
+    new ResizeObserver(report).observe(document.documentElement);
+    report();
+  }
+
+  const fromParam = Number(params.get("step"));
   const fromHash = /^#step-(\d+)$/.exec(location.hash);
-  go(fromHash ? Number(fromHash[1]) - 1 : 0);
+  const start = fromParam ? fromParam - 1 : !EMBED && fromHash ? Number(fromHash[1]) - 1 : 0;
+  go(start);
 })();
 </script>
-
-</body></html>
+</body>
+</html>
