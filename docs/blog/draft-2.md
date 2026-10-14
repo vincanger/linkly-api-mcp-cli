@@ -257,20 +257,7 @@ The MCP spec recommends a way of identifying clients called CIMD (Client ID Meta
 
 Here's what connecting to Linkly looks like for an agent. The user pastes Linkly's MCP URL into their client (usually as a "connector" or via a CLI command), a browser window opens on Linkly, they log in if they aren't already, and they see this:
 
-<!-- TODO: replace this mockup with a screenshot of the consent screen (src/oauth/ui/ConsentPage.tsx), e.g. ./assets/consent-screen.png -->
-
-```
-Allow Claude Code to access your Linkly account?
-App address: claude.ai
-Linkly hasn't verified this app. Only continue if you trust claude.ai.
-
-What it can do
-Links      [x] View your links
-           [x] Create, edit, and delete your links
-Analytics  [x] View click analytics
-[on] Require confirmation for destructive actions
-                                         [Deny]  [Allow]
-```
+![Linkly's consent screen asking whether to allow Claude Code (claude.ai) to access your Linkly account, with a checkbox for each permission, a "Require confirmation for destructive actions" toggle, and Deny and Allow buttons](./assets/screenshot-consent.png)
 
 Nobody has to create a token, copy it, and paste it somewhere. Nobody has to go to a dashboard and pre-register an OAuth app's client ID and secret either. Instead, they just paste an MCP URL, click Connect and Allow, and they're done. The client keeps the token and attaches it to every request on its own, so the model never even sees it. That's what I meant in [Part 1](#what-mcp-gives-you-that-an-api-cant) when I said the client handles the login.
 

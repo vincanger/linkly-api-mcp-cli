@@ -1,5 +1,7 @@
 # Linkly
 
+![Linkly's landing page](docs/blog/assets/screenshot-landing.png)
+
 Linkly is a small link shortener that counts clicks. It's the example app for the Wasp blog post [How to make your app usable by AI agents (MCPs, APIs, CLIs)](BLOG_POST_URL), <!-- TODO: replace BLOG_POST_URL with the post's URL on wasp.sh/blog --> and it's meant to be read alongside it. All the examples in the post come from this repo, so if you want to see the full code behind a snippet, it's here.
 
 The post's advice, in short:
@@ -11,19 +13,7 @@ The post's advice, in short:
 
 Linkly follows that structure. The dashboard, the REST API, and the MCP server all call the same service functions, and the CLI is a client of the REST API:
 
-```
-                ┌──────────────┐
-  Dashboard ───▶│ operations.ts│──┐
-                └──────────────┘  │
-                ┌──────────────┐  │    ┌────────────┐     ┌────────┐
-  REST API ────▶│   rest.ts    │──┼───▶│ service.ts │────▶│ Prisma │
-                └──────────────┘  │    └────────────┘     └────────┘
-                ┌──────────────┐  │
-  MCP ─────────▶│    mcp.ts    │──┘
-                └──────────────┘
-
-  CLI (user's machine) ── HTTP + token ──▶ REST API
-```
+![Two layers: the dashboard, MCP server, and REST API are thin adapters over the same createLink() operation, and the CLI calls the REST API](docs/blog/assets/two-layers.svg)
 
 ## Where to find things
 
@@ -65,6 +55,10 @@ claude mcp add --transport http linkly http://localhost:3001/mcp
 ```
 
 Your browser opens Linkly's consent screen. Log in, click Allow, and it's connected. Manage connected apps at `/settings/connections`.
+
+Stats results from `get_link_stats` include a `dashboardUrl`, so the agent can hand you the same chart in Linkly:
+
+![Click stats for /r/wasp in Linkly's dashboard, grouped by referrer](docs/blog/assets/screenshot-link-stats-by-referrer.png)
 
 Deletions wait for your confirmation, unless you turn that off for the connection. Claude Code opens Linkly's confirmation page itself after asking you; other clients give you a link to open.
 
