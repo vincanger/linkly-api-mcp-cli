@@ -1,6 +1,15 @@
 # Linkly
 
-Linkly shortens links and counts clicks. It's a small product on purpose: it exists as a **teaching reference for a well-structured MCP server**. One service layer is exposed four ways: a dashboard, a REST API, an MCP server, and a CLI built on the REST API.
+Linkly is a small link shortener that counts clicks. It's the example app for the Wasp blog post [How to make your app usable by AI agents (MCPs, APIs, CLIs)](BLOG_POST_URL), <!-- TODO: replace BLOG_POST_URL with the post's URL on wasp.sh/blog --> and it's meant to be read alongside it. All the examples in the post come from this repo, so if you want to see the full code behind a snippet, it's here.
+
+The post's advice, in short:
+
+- **Build a good MCP server and a REST API at the same time, on one layer of operations.** Your logic lives in plain functions, and each surface is a thin adapter over them.
+- **Put most of your care into the MCP server.** It's the standard built for agents, and it's where they get the best experience: tools written for the model, OAuth login with no setup, and destructive actions that wait for the human to confirm in your app.
+- **Use the API for code that runs on its own,** like exports, bulk writes, nightly syncs, other companies' integrations, and scripts an agent writes and reruns.
+- **A CLI probably isn't necessary,** unless agents need to work with local files. But it's easy to add once you have a good API underneath.
+
+Linkly follows that structure. The dashboard, the REST API, and the MCP server all call the same service functions, and the CLI is a client of the REST API:
 
 ```
                 ┌──────────────┐
@@ -13,19 +22,23 @@ Linkly shortens links and counts clicks. It's a small product on purpose: it exi
   MCP ─────────▶│    mcp.ts    │──┘
                 └──────────────┘
 
-  CLI (user's machine) ── HTTP + PAT ──▶ REST API
+  CLI (user's machine) ── HTTP + token ──▶ REST API
 ```
 
-## Learn how it works
+## Where to find things
 
-Start at the top and go deeper as you need to:
+Each part of the post's guide maps to a spot in the repo:
 
-1. [Linkly's Four Ways In](https://claude.ai/artifact/QAS55rqPuKkD1ccAGc6M31) (animation): one "create a link" request through all four surfaces to the same service function.
-2. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): every design decision, why it was made, and the code that implements it.
-3. [`docs/OAUTH-FOR-AGENTS.md`](docs/OAUTH-FOR-AGENTS.md): how an MCP client logs in with no registration, for newcomers to OAuth.
-4. [`docs/AGENT-READY-APPS.md`](docs/AGENT-READY-APPS.md) covers when to use the options (API, CLI, MCP), auth, and the fastest path. It also includes notes on what Wasp can do to provide these in the future.
+- **Operations:** `src/<feature>/service.ts` (links, analytics, account, docs), with the dashboard's Wasp operations, `rest.ts`, and `mcp.ts` next to each one.
+- **The MCP server:** [`src/mcp/`](src/mcp/) for the server and tool registry, and each feature's `mcp.ts` for its tools.
+- **The REST API:** each feature's `rest.ts`, plus the OpenAPI document generated from the same schemas in [`src/openapi/`](src/openapi/).
+- **OAuth:** [`src/oauth/`](src/oauth/). One OAuth server sits in front of both MCP and REST, clients identify themselves with CIMD (no registration), and the consent screen lets people choose each permission. Personal access tokens are there for scripts and the CLI.
+- **Destructive actions:** [`src/mcp/confirmations.ts`](src/mcp/confirmations.ts) (URL-mode elicitation) and [`src/deeplinks/`](src/deeplinks/), the confirmation pages in Linkly that MCP and REST both send you to.
+- **The CLI:** [`cli/`](cli/), with its types generated from the OpenAPI document.
+- **Discovery:** [`src/discovery/`](src/discovery/) for `llms.txt` and the API catalog at `/.well-known`.
+- **Parity tests:** [`src/mcp/parity.test.ts`](src/mcp/parity.test.ts), [`tests/cliParity.test.ts`](tests/cliParity.test.ts), [`tests/destructiveFlags.test.ts`](tests/destructiveFlags.test.ts), and [`cli/test/drift.spec.ts`](cli/test/drift.spec.ts) keep the surfaces from drifting apart.
 
-For the build itself, [`SPEC.md`](SPEC.md) is the full spec. Of its optional milestones, M10 (agent discovery: `llms.txt`, prerendered pages, and OpenAPI at `/.well-known`) and M12 (confirming deletions through URL-mode elicitation) are built; M11 (Dynamic Client Registration) isn't yet.
+There's also an animation, [Linkly's Four Ways In](https://claude.ai/artifact/QAS55rqPuKkD1ccAGc6M31), that follows one "create a link" request through all four surfaces to the same service function.
 
 ## Run it
 
@@ -84,4 +97,4 @@ npm run test:e2e  # Playwright: starts `wasp start` on linkly_test, runs browser
 npm run test:build  # wasp build + a client build: llms.txt and prerendered pages (not while wasp start runs)
 ```
 
-Create the test database once: `docker exec <wasp-dev-db container> psql -U postgresWaspDevUser -c "CREATE DATABASE linkly_test;"`, or point `TEST_DATABASE_URL` at any Postgres database. What each kind of test covers is in [Testing strategy](docs/ARCHITECTURE.md#testing-strategy).
+Create the test database once: `docker exec <wasp-dev-db container> psql -U postgresWaspDevUser -c "CREATE DATABASE linkly_test;"`, or point `TEST_DATABASE_URL` at any Postgres database.
