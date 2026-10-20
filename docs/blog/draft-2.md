@@ -57,6 +57,9 @@ And [MCP Events](https://mixed-news.com/en/chatgpt-mcp-events-webhooks-draft-spe
 Client support for both of these features is still uneven (as of October 2026), so it's important to consider fallbacks. Only some of them can open Linkly's confirmation page, for example, and not all can show an MCP App (Although the major ones like ChatGPT and Claude can). So each feature benefits from a fallback for the clients that lag behind, and the nice thing is that a link to your app is almost always a good one:
 
 - Linkly can't draw a chart in every chat, so every stats result includes a `dashboardUrl` that opens the same chart in the app.
+
+  ![Click stats for /r/wasp in Linkly's dashboard, grouped by referrer](./assets/screenshot-link-stats-by-referrer.png)
+
 - Clients that can't open the confirmation page get the same page as a link in the tool result, for the agent to pass along.
 - And instead of a form in the chat, `get_dashboard_url` can return a link to Linkly's create form, already filled in.
 
@@ -333,6 +336,9 @@ Why not just mark the MCP tool with `destructiveHint` and let the client handle 
 Two last things:
 
 - **Let each connection choose.** The consent screen's "Require confirmation for destructive actions" toggle is on by default and saved with the grant, and users can change it later on the Connected apps page. Dashboard sessions and personal access tokens delete right away: in the dashboard you're already the human, and a script has to run without anyone clicking.
+
+  ![Linkly's Connected apps page: a "Connect an AI agent" card with the MCP server URL and a prompt to copy, and Claude Code listed with its permissions, a Confirm deletions toggle, and a Revoke button](./assets/screenshot-connections.png)
+
 - **Offer a way back.** `delete_link`'s description ends with "Consider update_link with archived: true instead if they might want it back." An archived link stops redirecting, but nothing is lost.
 
 And since each surface marks deletes its own way (`x-destructive` in the OpenAPI doc, `destructiveHint` on the MCP tool, and `--yes` on the CLI), Linkly has a [test](https://github.com/vincanger/linkly-api-mcp-cli/blob/main/tests/destructiveFlags.test.ts) that checks they all agree.
@@ -360,6 +366,9 @@ Say a user tells their agent to "use myapp.com". The agent fetches your homepage
 
 - **An `llms.txt` at the root of your domain.** It's a short Markdown file that tells an agent how to connect. Linkly [generates it at build time](https://github.com/vincanger/linkly-api-mcp-cli/blob/main/src/discovery/llmsTxt.ts) from the same paths and docs the app uses, so it can't go stale.
 - **A prerendered landing page with a visible "For AI agents" section.** Agents usually fetch your page and read it as text, so the text needs to be in the HTML before any JavaScript runs. Linkly prerenders its homepage and docs (`prerender: true` on the route in Wasp), and the homepage has a ["For AI agents" card](https://github.com/vincanger/linkly-api-mcp-cli/blob/main/src/app/HomePage.tsx#L45-L63) with the MCP URL and a link to `llms.txt`.
+
+  ![Linkly's prerendered homepage with a "For AI agents" card that gives the MCP server URL and the llms.txt URL](./assets/screenshot-landing.png)
+
 - **Your OpenAPI document at well-known places.** Linkly serves it at `/.well-known/openapi.json` for agents that guess that path, lists it in `/.well-known/api-catalog` (RFC 9727, the one registered path for this), and adds a `Link: <…/openapi.json>; rel="service-desc"` header to [every `/api/v1` response](https://github.com/vincanger/linkly-api-mcp-cli/blob/main/src/shared/http.ts#L38-L42). Code that follows links finds the document from any API call.
 
 The `llms.txt` only says what the OpenAPI document can't: which way to connect, what to do without OAuth, and the rules. Here's Linkly's, trimmed:

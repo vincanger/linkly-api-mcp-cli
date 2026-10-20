@@ -2,7 +2,7 @@
 
 Notes on placing the new screenshots in the [Notion version of the draft](https://app.notion.com/p/wasp-lang/How-to-make-your-app-usable-by-AI-agents-MCPs-APIS-CLIs-3f918a74854c800c9c51e0abf8bf5e4d). All of them are in `docs/blog/assets/`. They were taken on 2026-10-14 from the deployed app (linkly-mcp-client.fly.dev), logged in as `vinny`, at 1440px wide and 2x scale.
 
-Heads-up: most of these were taken before the latest redeploy, while Fly was still on the Oct 1 build. The landing page has since been retaken with the "For AI agents" card, but `screenshot-connections.png` is still the old version without the "Connect an AI agent" card, so retake it if you want the card in it.
+Heads-up: most of these were taken before the latest redeploy, while Fly was still on the Oct 1 build. The landing page has since been retaken with the "For AI agents" card, and so has `screenshot-connections.png`, which now shows the "Connect an AI agent" card above the connected apps table.
 
 The clicks on `/r/wasp` (47, from x.com, news.ycombinator.com, github.com, google.com, and direct) are test clicks I sent so the charts have something in them. They all landed on Oct 14, so the "by day" chart is a flat line with one spike.
 
@@ -14,7 +14,7 @@ This one replaces the existing TODO callout ("replace this mockup with a screens
 
 It also backs up the later paragraph that starts "Let's take a step back and look at the permissions on the consent screen", so you could leave that paragraph as is.
 
-### `screenshot-connections.png` → "Destructive actions wait for the human, on every surface"
+### `screenshot-connections.png` → "Destructive actions wait for the human, on every surface" (done: added to Notion and draft-2.md)
 
 In the "Two last things" list, the **Let each connection choose** bullet says users can change the confirmation toggle "later on the Connected apps page". This screenshot shows exactly that page: Claude Code connected, its permissions, and the Confirm deletions toggle. It could go right after that bullet.
 
@@ -22,7 +22,7 @@ It could also work in the OAuth section, after the point that the client keeps t
 
 (After a redeploy this page also has the "Connect an AI agent" card, which the last paragraph of "Help agents find you from your domain" links to. A retake that includes the card could go there instead.)
 
-### `screenshot-link-stats-by-referrer.png` → "What MCP gives you that an API can't"
+### `screenshot-link-stats-by-referrer.png` → "What MCP gives you that an API can't" (done: added to Notion and draft-2.md)
 
 In the fallbacks list near the end of that section, the first bullet says "Linkly can't draw a chart in every chat, so every stats result includes a `dashboardUrl` that opens the same chart in the app." This is that chart, so it shows readers what the agent is actually handing them.
 
@@ -30,7 +30,7 @@ The same idea shows up in the table in "Where an API (and a CLI) still win" ("It
 
 `screenshot-link-stats-by-day.png` is the same page grouped by day. With all the clicks on one day it doesn't look great, so I'd use the referrer one.
 
-### `screenshot-landing.png` → "Help agents find you from your domain"
+### `screenshot-landing.png` → "Help agents find you from your domain" (done: added to Notion and draft-2.md)
 
 The second bullet ("A prerendered landing page with a visible 'For AI agents' section") is the obvious spot. The screenshot shows the hero and the "For AI agents" card with the MCP server URL and the llms.txt URL, so it fits right after that bullet. It's also the README header now.
 
