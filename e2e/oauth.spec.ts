@@ -29,7 +29,8 @@ test.describe("M4: OAuth with CIMD", () => {
       client_id_metadata_document_supported: true,
     });
     const mcp = await (await fetch(`${SERVER_URL}/.well-known/oauth-protected-resource/mcp`)).json();
-    expect(mcp).toMatchObject({ resource: `${SERVER_URL}/mcp`, authorization_servers: [SERVER_URL] });
+    // MCP clients start read-only; the rest comes by step-up.
+    expect(mcp).toMatchObject({ resource: `${SERVER_URL}/mcp`, authorization_servers: [SERVER_URL], scopes_supported: ["links:read", "analytics:read"] });
     const api = await (await fetch(`${SERVER_URL}/.well-known/oauth-protected-resource/api/v1`)).json();
     expect(api.resource).toBe(`${SERVER_URL}/api/v1`);
   });
@@ -303,24 +304,21 @@ test.describe("M8: toolsets and scopes", () => {
   const ANALYTICS = ["get_link_stats", "get_top_links"];
   const LINKS = ["create_link", "delete_link", "get_link", "list_links", "update_link"];
 
-  test("a grant with only Analytics sees core + analytics tools; ?toolsets= narrows but never widens", async ({ page }) => {
+  test("a grant with only Analytics sees every tool, and a Links tool asks for more scopes; ?toolsets= only narrows", async ({ page }) => {
     // Unticking read also unticks write for the same resource.
     const tokens = await oauthTokens(page, client, user, { uncheck: ["View your links"] });
     expect(tokens.scope).toBe("analytics:read");
 
     const all = await connectMcp(tokens.access_token);
-    expect(await all.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
-    // Not listed, and not callable either: an unknown tool is a protocol error.
-    await expect(all.call("list_links")).rejects.toThrow(/Tool list_links not found/);
+    expect(await all.toolNames()).toEqual([...CORE, ...ANALYTICS, ...LINKS].sort());
+    // Listed, but calling it is a 403 insufficient_scope challenge (step-up), not a tool run.
+    await expect(all.call("list_links")).rejects.toThrow(/403.*insufficient_scope/s);
     await all.close();
 
-    const widened = await connectMcp(tokens.access_token, "?toolsets=links,analytics");
-    expect(await widened.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
-    await widened.close();
-
-    const narrowed = await connectMcp(tokens.access_token, "?toolsets=links");
-    expect(await narrowed.toolNames()).toEqual(CORE);
+    const narrowed = await connectMcp(tokens.access_token, "?toolsets=analytics");
+    expect(await narrowed.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
     await narrowed.close();
+
   });
 
   test("read without write: the agent can look at links but not change them", async ({ page }) => {
@@ -328,12 +326,46 @@ test.describe("M8: toolsets and scopes", () => {
     expect(tokens.scope).toBe("links:read analytics:read");
 
     const mcp = await connectMcp(tokens.access_token);
-    expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, "get_link", "list_links"].sort());
-    await expect(mcp.call("create_link", { destinationUrl: "https://example.com" })).rejects.toThrow(/Tool create_link not found/);
+    expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, ...LINKS].sort());
+    expect((await mcp.call("list_links")).isError).toBeFalsy();
+    await expect(mcp.call("create_link", { destinationUrl: "https://example.com" })).rejects.toThrow(/403.*insufficient_scope/s);
     await mcp.close();
   });
 
-  test("editing a grant on the connections page changes the tool list on the next request", async ({ page }) => {
+  test("a read-only request still offers write, unticked; the confirmation switch needs it and starts on", async ({ page }) => {
+    // What an MCP client asks for first.
+    const { verifier, challenge } = pkcePair();
+    await logIn(page, user);
+    await page.goto(authorizeUrl(client, challenge, { scope: "links:read analytics:read" }));
+    await page.getByTestId("client-name").waitFor();
+    const write = page.getByLabel("Create, edit, and delete your links", { exact: true });
+    const confirm = page.getByLabel("Require confirmation for destructive actions");
+    await expect(write).not.toBeChecked();
+    await expect(confirm).toBeDisabled();
+    await expect(confirm).not.toBeChecked();
+
+    await write.check();
+    await expect(confirm).toBeEnabled();
+    await expect(confirm).toBeChecked();
+    await page.getByRole("button", { name: "Allow" }).click();
+    await page.waitForURL(/127\.0\.0\.1:\d+\/callback/);
+    const tokens = await tokenRequest({ grant_type: "authorization_code", code: client.lastCallback()!.code!, code_verifier: verifier, client_id: client.clientId, redirect_uri: client.redirectUri });
+    expect(tokens.body.scope).toBe("links:read links:write analytics:read");
+  });
+
+  test("re-consent (a step-up) starts from the user's confirmation setting and says the app wants more", async ({ page }) => {
+    await oauthTokens(page, client, user, { uncheck: ["View click analytics"], confirmDestructive: false });
+
+    // What a client sends after an analytics:read challenge.
+    await page.goto(authorizeUrl(client, pkcePair().challenge, { scope: "links:read links:write analytics:read" }));
+    await page.getByTestId("client-name").waitFor();
+    await expect(page.getByText("Test Client is already connected and is asking for more access.")).toBeVisible();
+    await expect(page.getByLabel("Require confirmation for destructive actions")).toBeEnabled();
+    await expect(page.getByLabel("Require confirmation for destructive actions")).not.toBeChecked();
+    await expect(page.getByLabel("View click analytics", { exact: true })).toBeChecked();
+  });
+
+  test("editing a grant on the connections page changes what the token can call on the next request", async ({ page }) => {
     const tokens = await oauthTokens(page, client, user);
     let mcp = await connectMcp(tokens.access_token);
     expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, ...LINKS].sort());
@@ -344,9 +376,9 @@ test.describe("M8: toolsets and scopes", () => {
     await row.getByLabel("View your links", { exact: true }).uncheck();
     await expect(page.getByText("Permissions updated")).toBeVisible();
 
-    // Same token, next request: the Links tools are gone.
+    // Same token, next request: the Links tools are still listed, but calling one asks for the scope back.
     mcp = await connectMcp(tokens.access_token);
-    expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS].sort());
+    await expect(mcp.call("list_links")).rejects.toThrow(/403.*insufficient_scope/s);
     await mcp.close();
 
     // The confirmation toggle applies immediately too.

@@ -21,7 +21,8 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: "npx prisma migrate deploy --schema schema.prisma && wasp start < /dev/null",
+    // Ports are pinned because e2e/env.ts hardcodes them; otherwise `wasp start` moves to free ones when these are taken.
+    command: "npx prisma migrate deploy --schema schema.prisma && wasp start --client-port 3000 --server-port 3001 < /dev/null",
     url: CLIENT_URL,
     timeout: 180_000,
     reuseExistingServer: false,

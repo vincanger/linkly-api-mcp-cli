@@ -7,7 +7,8 @@ import { OPENAPI_PATH } from "../discovery/paths";
 import { authenticateBearer, type BearerTarget } from "./bearer";
 import { toErrorResponse, toHttpResponse } from "./errors";
 import type { Principal } from "./principal";
-import { serverUrl } from "./urls";
+import { MCP_DEFAULT_SCOPES } from "./scopes";
+import { protectedResourceMetadataUrl, serverUrl } from "./urls";
 
 /**
  * Permissive CORS for /api/v1, /mcp, /oauth, and /.well-known. Browser-based
@@ -50,14 +51,11 @@ export const mcpMiddleware: MiddlewareConfigFn = withPermissiveCors;
 export const oauthMiddleware: MiddlewareConfigFn = withPermissiveCors;
 export const wellKnownMiddleware: MiddlewareConfigFn = withPermissiveCors;
 
-export function protectedResourceMetadataUrl(target: BearerTarget): string {
-  return `${serverUrl()}/.well-known/oauth-protected-resource/${target === "mcp" ? "mcp" : "api/v1"}`;
-}
-
 /**
  * Wraps a handler so it only runs with a valid bearer token, and receives the
  * Principal. On failure: 401 with a WWW-Authenticate header pointing at the
- * protected-resource metadata, so clients can discover the auth server.
+ * protected-resource metadata, so clients can discover the auth server. On
+ * /mcp it also names the scopes to start with, which MCP clients request first.
  */
 export function withBearer(
   target: BearerTarget,
@@ -70,10 +68,8 @@ export function withBearer(
     } catch (e) {
       const { status, body } = toErrorResponse(e);
       if (status === 401) {
-        res.setHeader(
-          "WWW-Authenticate",
-          `Bearer resource_metadata="${protectedResourceMetadataUrl(target)}"`,
-        );
+        const scope = target === "mcp" ? `, scope="${MCP_DEFAULT_SCOPES.join(" ")}"` : "";
+        res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${protectedResourceMetadataUrl(target)}"${scope}`);
       }
       res.status(status).json(body);
       return;

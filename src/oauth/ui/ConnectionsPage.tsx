@@ -133,7 +133,13 @@ function GrantRow({ grant: g }: { grant: GrantOut }) {
         <ScopeChecklist idPrefix={g.id} offered={g.requestedScopes} selected={scopes} onChange={saveScopes} />
       </TableCell>
       <TableCell>
-        <Switch aria-label={`Require confirmation for ${g.clientName}`} checked={confirm} onCheckedChange={saveConfirm} />
+        {/* Confirmations only apply to deletions, which need write access. */}
+        <Switch
+          aria-label={`Require confirmation for ${g.clientName}`}
+          checked={confirm && scopes.includes("links:write")}
+          disabled={!scopes.includes("links:write")}
+          onCheckedChange={saveConfirm}
+        />
       </TableCell>
       <TableCell>{new Date(g.createdAt).toLocaleDateString()}</TableCell>
       <TableCell>{g.lastUsedAt ? new Date(g.lastUsedAt).toLocaleString() : "Never"}</TableCell>

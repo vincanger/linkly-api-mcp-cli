@@ -17,12 +17,8 @@ const deps = { prisma };
 
 export const getAuthorizeRequest: GetAuthorizeRequest<
   authorize.AuthorizeParams,
-  authorize.ValidAuthorizeRequest | authorize.RedirectableAuthorizeError
-> = (args, context) =>
-  runOperation(async () => {
-    sessionPrincipal(context);
-    return authorize.validateAuthorizeRequest(args, deps);
-  });
+  authorize.AuthorizeRequestView | authorize.RedirectableAuthorizeError
+> = (args, context) => runOperation(() => authorize.describeAuthorizeRequest(sessionPrincipal(context), args, deps));
 
 export const approveAuthorization: ApproveAuthorization<
   { params: authorize.AuthorizeParams; scopes: string[]; confirmDestructive: boolean },

@@ -9,6 +9,13 @@ export const SCOPES = {
 export type Scope = keyof typeof SCOPES;
 export const ALL_SCOPES = Object.keys(SCOPES) as Scope[];
 
+/**
+ * What MCP clients ask for when they first connect: read-only. Changing links
+ * is asked for when the agent first tries to (step-up), so the user approves
+ * write access when it's about to be used, not upfront.
+ */
+export const MCP_DEFAULT_SCOPES: Scope[] = ["links:read", "analytics:read"];
+
 export const TOOLSETS = {
   links: { label: "Links", scopes: ["links:read", "links:write"] },
   analytics: { label: "Analytics", scopes: ["analytics:read"] },

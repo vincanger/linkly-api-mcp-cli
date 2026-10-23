@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { principalFromGrant, principalFromPat, principalFromSession, type Principal } from "../shared/principal";
 import { createTestUser, prisma, resetDb } from "../test/db";
-import { SERVER_INSTRUCTIONS } from "./server";
+import { authInfoFor, linklyMcpHandler, SERVER_INSTRUCTIONS } from "./server";
 import { connectInProcess } from "./testClient";
 
 let conn: Awaited<ReturnType<typeof connectInProcess>> | null = null;
@@ -143,5 +143,26 @@ describe("MCP server", () => {
     expect(await names(pat(), ["analytics"])).toEqual(["get_dashboard_url", "get_link_stats", "get_top_links", "read_doc", "search_docs", "whoami"]);
     const readOnly = pat(["links:read"]);
     expect(await names(readOnly)).toEqual(["get_dashboard_url", "get_link", "list_links", "read_doc", "search_docs", "whoami"]);
+  });
+
+  it("answers a call an OAuth grant lacks the scope for with 403 insufficient_scope, without running the tool", async () => {
+    const grant = principalFromGrant({ id: "g1", userId, clientName: "Claude", scopes: ["analytics:read"], confirmDestructive: true });
+    const handler = linklyMcpHandler({ prisma, log: () => {} });
+    const res = await handler.fetch(
+      new Request("http://localhost:3001/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", "Mcp-Protocol-Version": "2025-11-25" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "create_link", arguments: { destinationUrl: "https://a.com" } } }),
+      }),
+      { authInfo: authInfoFor(grant) },
+    );
+    await handler.close();
+    expect(res.status).toBe(403);
+    const challenge = res.headers.get("WWW-Authenticate")!;
+    expect(challenge).toMatch(/^Bearer /);
+    expect(challenge).toContain('error="insufficient_scope"');
+    expect(challenge).toContain('scope="links:read links:write analytics:read"');
+    expect(challenge).toContain('resource_metadata="http://localhost:3001/.well-known/oauth-protected-resource/mcp"');
+    expect(await prisma.link.count()).toBe(0);
   });
 });

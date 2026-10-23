@@ -4,7 +4,8 @@ import { ALL_TOOLSETS, SCOPES, TOOLSETS, toggleScope, type Scope } from "../../s
 
 /**
  * One checkbox per scope, grouped by toolset, so read and write are separate
- * choices. Shows only the `offered` scopes (what the app asked for).
+ * choices. Shows only the `offered` scopes: every scope on the consent screen,
+ * what the app asked for or was granted on the connections page.
  * Used by the consent screen and the connections page.
  */
 export function ScopeChecklist({

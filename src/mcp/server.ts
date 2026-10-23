@@ -14,10 +14,11 @@ import {
 import { z } from "zod";
 import { toMcpToolError } from "../shared/errors";
 import type { Principal } from "../shared/principal";
-import type { Toolset } from "../shared/scopes";
+import { SCOPES, type Toolset } from "../shared/scopes";
+import { protectedResourceMetadataUrl } from "../shared/urls";
 import { confirmations, type ConfirmationDeps } from "./confirmations";
 import type { AnyToolDef } from "./defineTool";
-import { allTools, parseToolsetsParam, toolsFor } from "./registry";
+import { allTools, parseToolsetsParam, stepUpScopes, toolsFor } from "./registry";
 import { allResources, type ResourceDef } from "./resources";
 
 export const SERVER_VERSION = "1.0.0";
@@ -66,6 +67,16 @@ export function buildServer(opts: {
         inputSchema: z.object(tool.input),
         outputSchema,
         annotations: { title: tool.title, ...tool.annotations },
+        // Missing scope: the handler answers 403 insufficient_scope instead of
+        // running the tool, and the client asks the user to allow more (step-up).
+        scopeChallenge: () => {
+          const scopes = stepUpScopes(tool, principal);
+          if (!scopes) return undefined;
+          return {
+            scopes: scopes as [string, ...string[]],
+            errorDescription: `${tool.name} needs permission to ${SCOPES[tool.scope!].toLowerCase()}`,
+          };
+        },
       },
       async (input: Record<string, unknown>, ctx): Promise<CallToolResult | InputRequiredResult> => {
         const started = Date.now();
@@ -101,9 +112,19 @@ export function buildServer(opts: {
   return server;
 }
 
-/** How the bearer middleware hands its principal to the MCP handler (`authInfo.extra`). */
+/**
+ * How the bearer middleware hands its principal to the MCP handler
+ * (`authInfo.extra`). `resourceMetadataUrl` goes into scope challenges, so
+ * clients can find the authorization server again for step-up.
+ */
 export function authInfoFor(principal: Principal): AuthInfo {
-  return { token: "", clientId: principal.clientName ?? principal.source, scopes: [...principal.scopes], extra: { principal } };
+  return {
+    token: "",
+    clientId: principal.clientName ?? principal.source,
+    scopes: [...principal.scopes],
+    resourceMetadataUrl: protectedResourceMetadataUrl("mcp"),
+    extra: { principal },
+  };
 }
 
 /**

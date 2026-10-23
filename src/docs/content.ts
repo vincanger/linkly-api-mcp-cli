@@ -106,7 +106,9 @@ For clients that only support a static header, create a [personal access token](
 | \`links:write\` | Create, edit, and delete your links |
 | \`analytics:read\` | View click analytics |
 
-On the consent screen, each scope is its own checkbox, grouped into **toolsets**: **Links** (\`links:read\`, \`links:write\`) and **Analytics** (\`analytics:read\`). You can allow viewing links without allowing changes. Ticking a write scope also ticks its read scope, since changing a link also shows it. An app only gets the scopes it asked for and you approved, and only sees the MCP tools those scopes allow. On Connections you can remove scopes later or restore them, up to what the app asked for.
+On the consent screen, each scope is its own checkbox, grouped into **toolsets**: **Links** (\`links:read\`, \`links:write\`) and **Analytics** (\`analytics:read\`). You can allow viewing links without allowing changes. Ticking a write scope also ticks its read scope, since changing a link also shows it. Every scope is offered; the ones the app asked for are pre-checked, and you can tick others too. **Require confirmation for destructive actions** only applies with write access, and is on by default. On Connections you can remove scopes later or restore them, up to what the app asked for or you granted.
+
+MCP clients start by asking for read-only access (\`links:read\` and \`analytics:read\`). An app connected with OAuth sees every MCP tool, including ones you haven't allowed yet. If it calls one of those, Linkly answers with an \`insufficient_scope\` challenge naming the scopes it needs, and the app sends you back to the consent screen to allow them (step-up authorization). Nothing runs until you do. A personal access token can't ask for more, so it only sees the tools its scopes allow.
 
 Some tools are always available because they don't touch your data: \`whoami\`, \`search_docs\`, \`read_doc\`, and \`get_dashboard_url\`.
 

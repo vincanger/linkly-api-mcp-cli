@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "../../components/ui/field";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Switch } from "../../components/ui/switch";
-import type { Scope } from "../../shared/scopes";
+import { ALL_SCOPES, type Scope } from "../../shared/scopes";
 import type { AuthorizeParams } from "../authorize";
 import { ScopeChecklist } from "./ScopeChecklist";
 
@@ -48,7 +48,7 @@ export function ConsentPage() {
   }, [data]);
 
   const [scopes, setScopes] = useState<Scope[] | null>(null);
-  const [confirmDestructive, setConfirmDestructive] = useState(true);
+  const [confirmDestructive, setConfirmDestructive] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState<"allow" | "deny" | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -72,6 +72,17 @@ export function ConsentPage() {
   }
 
   const selected = scopes ?? data.requestedScopes;
+  // Re-consent keeps the user's earlier choice; a new connection confirms by default.
+  const existing = data.existingGrant;
+  // Confirmations only apply to deletions, so the switch needs write access. On
+  // by default; re-consent keeps the user's earlier choice.
+  const canWrite = selected.includes("links:write");
+  const confirm = confirmDestructive ?? existing?.confirmDestructive ?? true;
+  const reconnectNote = !existing
+    ? null
+    : data.requestedScopes.some((s) => !existing.scopes.includes(s))
+      ? `${data.clientName} is already connected and is asking for more access. `
+      : `${data.clientName} is already connected. Allowing again updates what it can do. `;
 
   async function submit(kind: "allow" | "deny") {
     setSubmitting(kind);
@@ -79,7 +90,7 @@ export function ConsentPage() {
     try {
       const { redirectTo } =
         kind === "allow"
-          ? await approveAuthorization({ params, scopes: selected, confirmDestructive })
+          ? await approveAuthorization({ params, scopes: selected, confirmDestructive: canWrite ? confirm : (existing?.confirmDestructive ?? true) })
           : await denyAuthorization({ params });
       window.location.assign(redirectTo);
     } catch (e) {
@@ -108,14 +119,23 @@ export function ConsentPage() {
         <FieldGroup>
           <FieldSet>
             <FieldLegend variant="label">What it can do</FieldLegend>
-            <FieldDescription>Searching docs and opening dashboard links are always allowed.</FieldDescription>
-            <ScopeChecklist idPrefix="scope" offered={data.requestedScopes} selected={selected} onChange={setScopes} />
+            <FieldDescription>
+              {reconnectNote}
+              Searching docs and opening dashboard links are always allowed.
+            </FieldDescription>
+            <ScopeChecklist idPrefix="scope" offered={ALL_SCOPES} selected={selected} onChange={setScopes} />
           </FieldSet>
           <Field orientation="horizontal">
-            <Switch id="confirm-destructive" checked={confirmDestructive} onCheckedChange={setConfirmDestructive} />
+            <Switch id="confirm-destructive" checked={canWrite && confirm} disabled={!canWrite} onCheckedChange={setConfirmDestructive} />
             <FieldContent>
-              <FieldLabel htmlFor="confirm-destructive">Require confirmation for destructive actions</FieldLabel>
-              <FieldDescription>Deletions send you a link to confirm in Linkly instead of happening right away.</FieldDescription>
+              <FieldLabel htmlFor="confirm-destructive" className={canWrite ? undefined : "text-muted-foreground"}>
+                Require confirmation for destructive actions
+              </FieldLabel>
+              <FieldDescription>
+                {canWrite
+                  ? "Deletions send you a link to confirm in Linkly instead of happening right away."
+                  : "Only applies when the app can create, edit, and delete your links."}
+              </FieldDescription>
             </FieldContent>
           </Field>
         </FieldGroup>

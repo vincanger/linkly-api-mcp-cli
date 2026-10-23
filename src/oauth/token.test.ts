@@ -4,7 +4,7 @@ import { authenticateBearer } from "../shared/bearer";
 import { principalFromSession, type Principal } from "../shared/principal";
 import { ALL_SCOPES } from "../shared/scopes";
 import { createTestUser, prisma, resetDb } from "../test/db";
-import { approveAuthorization, denyAuthorization, validateAuthorizeRequest, type AuthorizeParams } from "./authorize";
+import { approveAuthorization, denyAuthorization, describeAuthorizeRequest, validateAuthorizeRequest, type AuthorizeParams } from "./authorize";
 import { InvalidClientError } from "./cimd";
 import { revokeToken } from "./revoke";
 import { exchangeToken, pkceChallenge } from "./token";
@@ -51,6 +51,15 @@ const exchange = (code: string, verifier: string, extra: Record<string, string> 
   exchangeToken({ grant_type: "authorization_code", code, code_verifier: verifier, client_id: CLIENT_ID, redirect_uri: REDIRECT, ...extra }, deps);
 
 describe("authorization request", () => {
+  it("shows the user's current grant for the client, so re-consent starts from it", async () => {
+    expect(await describeAuthorizeRequest(user, authParams("v".repeat(43)), deps)).toMatchObject({ ok: true, existingGrant: null });
+
+    const first = await authorize({ scopes: ["links:read"], confirmDestructive: false });
+    expect((await exchange(first.code, first.verifier)).status).toBe(200);
+    const stepUp = await describeAuthorizeRequest(user, authParams("v".repeat(43), { scope: "links:read links:write" }), deps);
+    expect(stepUp).toMatchObject({ ok: true, requestedScopes: ["links:read", "links:write"], existingGrant: { scopes: ["links:read"], confirmDestructive: false } });
+  });
+
   it("returns the client and the requested scopes", async () => {
     const req = await validateAuthorizeRequest(authParams("v".repeat(43), { scope: "analytics:read" }), deps);
     expect(req).toMatchObject({ ok: true, clientName: "Example Client", clientHost: "client.example.com", requestedScopes: ["analytics:read"], resource: MCP });
@@ -81,8 +90,8 @@ describe("authorization request", () => {
     expect(new URL(redirectTo).searchParams.get("error")).toBe("access_denied");
   });
 
-  it("limits granted scopes to what the client requested", async () => {
-    const { code, verifier } = await authorize({ params: { scope: "links:read" } });
+  it("grants what the user ticked, ignoring anything that isn't a scope", async () => {
+    const { code, verifier } = await authorize({ params: { scope: "links:read" }, scopes: ["links:read", "admin"] });
     const res = await exchange(code, verifier);
     expect(res.status === 200 && res.body.scope).toBe("links:read");
   });
@@ -93,6 +102,14 @@ describe("authorization request", () => {
     expect(res.status === 200 && res.body.scope).toBe("links:read analytics:read");
     const grant = await prisma.grant.findFirstOrThrow({ where: { userId: user.userId } });
     expect(grant).toMatchObject({ scopes: ["links:read", "analytics:read"], requestedScopes: ALL_SCOPES });
+  });
+
+  it("lets the user grant more than a read-only request, and Connections can restore it later", async () => {
+    const { code, verifier } = await authorize({ params: { scope: "links:read analytics:read" }, scopes: ["links:read", "links:write"] });
+    const res = await exchange(code, verifier);
+    expect(res.status === 200 && res.body.scope).toBe("links:read links:write");
+    const grant = await prisma.grant.findFirstOrThrow({ where: { userId: user.userId } });
+    expect(grant).toMatchObject({ scopes: ["links:read", "links:write"], requestedScopes: ALL_SCOPES });
   });
 });
 

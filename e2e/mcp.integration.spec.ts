@@ -71,7 +71,7 @@ test("/mcp: 401 with discovery header, 405 for GET, audience enforced", async ()
   });
   expect(anonymous.status).toBe(401);
   expect(anonymous.headers.get("www-authenticate")).toBe(
-    `Bearer resource_metadata="${SERVER_URL}/.well-known/oauth-protected-resource/mcp"`,
+    `Bearer resource_metadata="${SERVER_URL}/.well-known/oauth-protected-resource/mcp", scope="links:read analytics:read"`,
   );
   expect((await fetch(`${SERVER_URL}/mcp`)).status).toBe(405);
 

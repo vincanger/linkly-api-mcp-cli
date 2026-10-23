@@ -20,6 +20,8 @@ export const serverUrl = (): string => bases.serverUrl;
 export const frontendUrl = (): string => bases.frontendUrl;
 export const mcpResourceUrl = (): string => `${bases.serverUrl}/mcp`;
 export const apiResourceUrl = (): string => `${bases.serverUrl}/api/v1`;
+export const protectedResourceMetadataUrl = (target: "api" | "mcp"): string =>
+  `${bases.serverUrl}/.well-known/oauth-protected-resource/${target === "mcp" ? "mcp" : "api/v1"}`;
 export const shortUrl = (slug: string): string => `${bases.serverUrl}/r/${slug}`;
 
 function stripSlash(url: string): string {

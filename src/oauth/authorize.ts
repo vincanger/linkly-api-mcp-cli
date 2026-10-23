@@ -3,7 +3,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { generateSecret, sha256Hex, TOKEN_PREFIX } from "../shared/crypto";
 import { requireSession, type Principal } from "../shared/principal";
-import { ALL_SCOPES, capScopes, isScope, normalizeScopes, type Scope } from "../shared/scopes";
+import { ALL_SCOPES, isScope, normalizeScopes, type Scope } from "../shared/scopes";
 import { apiResourceUrl, mcpResourceUrl, serverUrl } from "../shared/urls";
 import { InvalidClientError, redirectUriMatches, resolveClient, type CimdDeps } from "./cimd";
 
@@ -29,8 +29,17 @@ export type ValidAuthorizeRequest = {
   codeChallenge: string;
   state?: string;
   resource: string;
-  /** Scopes the client asked for (all scopes if it didn't ask). The consent screen offers these, pre-checked. */
+  /** Scopes the client asked for (all scopes if it didn't ask). The consent screen offers every scope, with these pre-checked. */
   requestedScopes: Scope[];
+};
+
+/**
+ * What the consent page shows: the request, plus this user's current grant for
+ * the client, if any. A grant means re-consent (often a step-up for more
+ * scopes), so the page starts from the user's existing choices.
+ */
+export type AuthorizeRequestView = ValidAuthorizeRequest & {
+  existingGrant: { scopes: Scope[]; confirmDestructive: boolean } | null;
 };
 
 /** A problem the client should hear about: the page redirects back with `error=`. */
@@ -100,6 +109,21 @@ export async function validateAuthorizeRequest(
   };
 }
 
+export async function describeAuthorizeRequest(
+  p: Principal,
+  params: AuthorizeParams,
+  deps: CimdDeps,
+): Promise<AuthorizeRequestView | RedirectableAuthorizeError> {
+  requireSession(p, "Reviewing an app's request");
+  const req = await validateAuthorizeRequest(params, deps);
+  if (!req.ok) return req;
+  const grant = await deps.prisma.grant.findFirst({ where: { userId: p.userId, clientId: req.clientId, revokedAt: null } });
+  return {
+    ...req,
+    existingGrant: grant ? { scopes: normalizeScopes(grant.scopes), confirmDestructive: grant.confirmDestructive } : null,
+  };
+}
+
 export async function approveAuthorization(
   p: Principal,
   input: { params: AuthorizeParams; scopes: string[]; confirmDestructive: boolean },
@@ -118,9 +142,11 @@ export async function approveAuthorization(
       clientId: req.clientId,
       redirectUri: req.redirectUri,
       codeChallenge: req.codeChallenge,
-      // Granted: what the user ticked, never more than the client asked for.
-      scopes: capScopes(input.scopes, req.requestedScopes),
-      requestedScopes: req.requestedScopes,
+      // Granted: what the user ticked, which can be more than the client asked
+      // for (MCP clients start read-only). The token response says what was granted.
+      scopes: normalizeScopes(input.scopes),
+      // The ceiling for later edits on Connections: what was asked for or granted.
+      requestedScopes: normalizeScopes([...req.requestedScopes, ...input.scopes]),
       resource: req.resource,
       confirmDestructive: input.confirmDestructive,
       expiresAt: new Date(now.getTime() + CODE_TTL_MS),

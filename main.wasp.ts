@@ -20,7 +20,7 @@ import { LLMS_TXT_PATH } from "./src/discovery/paths";
 // routes, operations, and APIs in its `<slice>.wasp.ts` file.
 export default app({
   name: "linkly",
-  wasp: { version: "^0.25.0" },
+  wasp: { version: "^0.26.0" },
   title: "Linkly",
   head: [
     "<link rel='icon' href='/favicon.ico' />",

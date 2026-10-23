@@ -1,12 +1,13 @@
 // RFC 9728 (protected resource) and RFC 8414 (authorization server) metadata.
-import { ALL_SCOPES } from "../shared/scopes";
+import { ALL_SCOPES, MCP_DEFAULT_SCOPES } from "../shared/scopes";
 import { apiResourceUrl, frontendUrl, mcpResourceUrl, serverUrl } from "../shared/urls";
 
 export function protectedResourceMetadata(target: "mcp" | "api") {
   return {
     resource: target === "mcp" ? mcpResourceUrl() : apiResourceUrl(),
     authorization_servers: [serverUrl()],
-    scopes_supported: ALL_SCOPES,
+    // For MCP this is the starting set (MCP clients request all of it), not every scope: the rest comes by step-up.
+    scopes_supported: target === "mcp" ? MCP_DEFAULT_SCOPES : ALL_SCOPES,
     bearer_methods_supported: ["header"],
     resource_name: target === "mcp" ? "Linkly MCP server" : "Linkly REST API",
     resource_documentation: `${frontendUrl()}/docs/${target === "mcp" ? "connecting-ai-clients" : "rest-api"}`,
