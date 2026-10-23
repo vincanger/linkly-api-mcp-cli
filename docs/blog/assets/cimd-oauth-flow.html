@@ -8,7 +8,7 @@
   Step-through walkthrough of an MCP client logging in with CIMD OAuth.
 
   Standalone: open the file as is.
-  Embedded:   ?embed=1 hides the intro and the step list, drops the page
+  Embedded:   ?embed=1 hides the intro and the notes, drops the page
               background, and stops rewriting the URL hash.
   Options:    ?theme=light|dark  forces a theme (default: follows the OS)
               ?step=N            opens on step N
@@ -203,27 +203,12 @@
   }
   .panel .label { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 
-  /* All steps */
+  /* Notes */
   .all { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); padding: 22px; }
-  .all h2 { font: 600 20px/1.2 var(--cond); margin: 0 0 12px; }
-  .all ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; counter-reset: s; }
-  .all li { counter-increment: s; }
-  .all li button {
-    width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px;
-    padding: 10px 12px 10px 48px; position: relative; font: 400 14.5px/1.5 var(--sans); color: var(--muted);
-    display: grid; gap: 4px;
-  }
-  .all li button::before {
-    content: counter(s); position: absolute; left: 12px; top: 10px; width: 24px; height: 24px; border-radius: 50%;
-    display: grid; place-items: center; font: 600 12px/1 var(--mono); background: var(--note-bg); color: var(--ink); border: 1px solid var(--line);
-  }
-  .all li button strong { color: var(--ink); font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .all li button:hover { background: var(--note-bg); }
-  .all li button[aria-current="step"] { border-color: var(--line); background: var(--note-bg); }
-  .fine { color: var(--muted); font-size: 13.5px; margin: 14px 0 0; max-width: 80ch; }
+  .fine { color: var(--muted); font-size: 13.5px; margin: 0; max-width: 80ch; }
 
   /* Embedded in a blog post: the post gives the context, so drop the intro,
-     the step list, and the page background, and always stack the panel
+     the notes, and the page background, and always stack the panel
      under the diagram (blog columns are narrower than the side-by-side layout). */
   .embed body { background: transparent; padding: 2px 0 6px; }
   .embed header.intro, .embed section.all { display: none; }
@@ -289,9 +274,7 @@
     </aside>
   </div>
 
-  <section class="all" aria-labelledby="allTitle">
-    <h2 id="allTitle">All nine steps</h2>
-    <ol id="allSteps"></ol>
+  <section class="all" aria-label="Notes">
     <p class="fine">Claude on the web works the same way, with one difference: its callback in step 7 is <code class="mono">claude.ai/api/mcp/auth_callback</code> on Anthropic's servers instead of a temporary server on your laptop, so Anthropic's servers make the step-8 call. The REST API uses the same login, with <code class="mono">resource=https://myapp.com/api/v1</code> in step 4. Step 5 shows a simplified metadata document; Claude Code's real one may list more fields. Random values like <code class="mono">a81f3c…</code> are examples.</p>
   </section>
 </div>
@@ -618,9 +601,9 @@ Authorization: Bearer lk_at_…
     return appearTable[`${actor}:${key}`] ?? 250;
   }
 
-  // ── Panel, dots, list ────────────────────────────────────────────────
+  // ── Panel, dots ────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
-  const dots = $("dots"), allSteps = $("allSteps");
+  const dots = $("dots");
   STEPS.forEach((s, i) => {
     const b = document.createElement("button");
     b.type = "button";
@@ -629,22 +612,6 @@ Authorization: Bearer lk_at_…
     if (isCimd(s)) b.classList.add("cimd");
     b.addEventListener("click", () => { stopPlay(); go(i); });
     dots.appendChild(b);
-
-    const li = document.createElement("li");
-    const lb = document.createElement("button");
-    lb.type = "button";
-    const strong = document.createElement("strong");
-    strong.append(document.createTextNode(s.title), chips(s.tags));
-    const span = document.createElement("span");
-    span.textContent = s.caption;
-    lb.append(strong, span);
-    lb.addEventListener("click", () => {
-      stopPlay();
-      go(i);
-      document.querySelector(".stage").scrollIntoView({ behavior: reduced.matches ? "auto" : "smooth", block: "start" });
-    });
-    li.appendChild(lb);
-    allSteps.appendChild(li);
   });
 
   // ── Playback ─────────────────────────────────────────────────────────
@@ -721,9 +688,6 @@ Authorization: Bearer lk_at_…
     [...dots.children].forEach((b, i) => {
       if (i === index) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
       b.classList.toggle("done", i < index);
-    });
-    [...allSteps.querySelectorAll("button")].forEach((b, i) => {
-      if (i === index) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
     });
 
     // Keep the newest messages in view.
