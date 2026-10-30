@@ -92,3 +92,7 @@ npm run test:build  # wasp build + a client build: llms.txt and prerendered page
 ```
 
 Create the test database once: `docker exec <wasp-dev-db container> psql -U postgresWaspDevUser -c "CREATE DATABASE linkly_test;"`, or point `TEST_DATABASE_URL` at any Postgres database.
+
+## License
+
+[MIT](LICENSE)
