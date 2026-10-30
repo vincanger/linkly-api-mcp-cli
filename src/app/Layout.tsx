@@ -68,9 +68,9 @@ export function Layout() {
         href="https://wasp.sh"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed right-4 bottom-4 z-40 rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+        className="fixed right-4 bottom-4 z-40 rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
-        Made with <span className="font-semibold text-foreground">Wasp.sh</span> <span className="font-mono font-semibold text-yellow-500">=&#125;</span>
+        <span className="">{'{'}= made with wasp ={'}'}</span>
       </a>
       <Toaster />
     </div>
