@@ -167,14 +167,68 @@ test.describe("M5: MCP client over OAuth", () => {
     const tools = (await mcpClient.listTools()).tools.map((t) => t.name);
     expect(tools).toEqual(expect.arrayContaining(["whoami", "list_links", "create_link", "get_link_stats"]));
     const who = await mcpClient.callTool({ name: "whoami", arguments: {} });
-    expect(who.structuredContent).toMatchObject({ source: "oauth", clientName: "Test Client", confirmDestructive: true });
-    const created = await mcpClient.callTool({ name: "create_link", arguments: { destinationUrl: "https://example.com/oauth" } });
-    expect(created.isError).toBeFalsy();
+    expect(who.structuredContent).toMatchObject({ source: "oauth", clientName: "Test Client", scopes: ["links:read", "analytics:read"] });
+    expect((await mcpClient.callTool({ name: "list_links", arguments: {} })).isError).toBeFalsy();
+    // MCP clients start read-only. SDK v1 answers an insufficient_scope
+    // challenge by refreshing, which can't widen the grant, so it gives up
+    // without running the tool. The v2 test below completes the step-up.
+    await expect(mcpClient.callTool({ name: "create_link", arguments: { destinationUrl: "https://example.com/oauth" } })).rejects.toMatchObject({ code: 403 });
     await mcpClient.close();
 
     // The MCP token is bound to /mcp: the REST API rejects it.
     const accessToken = (tokens as { access_token: string }).access_token;
     expect((await apiClient(accessToken)("GET", "/me")).status).toBe(401);
+  });
+
+  test("a 2026-07-28 client steps up: a write tool sends the user back to consent, then the call runs", async ({ page }) => {
+    const { Client, StreamableHTTPClientTransport, UnauthorizedError } = await import("@modelcontextprotocol/client");
+
+    let authorizationUrl: URL | null = null;
+    let verifier = "";
+    let tokens: Record<string, unknown> | undefined;
+    let discovery: unknown;
+    const provider = {
+      get redirectUrl() {
+        return client.redirectUri;
+      },
+      get clientMetadata() {
+        return { client_name: "Test Client", redirect_uris: [client.redirectUri], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" };
+      },
+      clientInformation: () => ({ client_id: client.clientId }),
+      tokens: () => tokens as never,
+      saveTokens: (t: Record<string, unknown>) => void (tokens = t),
+      redirectToAuthorization: (url: URL) => void (authorizationUrl = url),
+      saveCodeVerifier: (v: string) => void (verifier = v),
+      codeVerifier: () => verifier,
+      saveDiscoveryState: (s: unknown) => void (discovery = s),
+      discoveryState: () => discovery as never,
+    };
+
+    const url = new URL(`${SERVER_URL}/mcp`);
+    const mcpClient = new Client({ name: "oauth-e2e-modern", version: "1.0.0" }, { versionNegotiation: { mode: "auto" } });
+    // v2 checks the RFC 9207 `iss` Linkly adds to the redirect.
+    const finishAuth = () => transport.finishAuth(client.lastCallback()!.code!, client.lastCallback()!.iss!);
+    let transport = new StreamableHTTPClientTransport(url, { authProvider: provider });
+    await expect(mcpClient.connect(transport)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(authorizationUrl!.searchParams.get("scope")).toBe("links:read analytics:read");
+    await consent(page, user, authorizationUrl!.toString());
+    await finishAuth();
+
+    transport = new StreamableHTTPClientTransport(url, { authProvider: provider });
+    await mcpClient.connect(transport);
+    expect((await mcpClient.callTool({ name: "list_links", arguments: {} })).isError).toBeFalsy();
+
+    // The challenge asks for what the grant has plus write, so the client re-authorizes.
+    authorizationUrl = null;
+    const createLink = () => mcpClient.callTool({ name: "create_link", arguments: { destinationUrl: "https://example.com/step-up" } });
+    await expect(createLink()).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(authorizationUrl!.searchParams.get("scope")!.split(" ").sort()).toEqual(["analytics:read", "links:read", "links:write"]);
+    expect(await db.link.count({ where: { userId: user.userId } })).toBe(0);
+
+    await consent(page, user, authorizationUrl!.toString());
+    await finishAuth();
+    expect((await createLink()).isError).toBeFalsy();
+    await mcpClient.close();
   });
 });
 
@@ -312,7 +366,7 @@ test.describe("M8: toolsets and scopes", () => {
     const all = await connectMcp(tokens.access_token);
     expect(await all.toolNames()).toEqual([...CORE, ...ANALYTICS, ...LINKS].sort());
     // Listed, but calling it is a 403 insufficient_scope challenge (step-up), not a tool run.
-    await expect(all.call("list_links")).rejects.toThrow(/403.*insufficient_scope/s);
+    await expect(all.call("list_links")).rejects.toMatchObject({ code: 403, message: expect.stringContaining("insufficient_scope") });
     await all.close();
 
     const narrowed = await connectMcp(tokens.access_token, "?toolsets=analytics");
@@ -328,7 +382,7 @@ test.describe("M8: toolsets and scopes", () => {
     const mcp = await connectMcp(tokens.access_token);
     expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, ...LINKS].sort());
     expect((await mcp.call("list_links")).isError).toBeFalsy();
-    await expect(mcp.call("create_link", { destinationUrl: "https://example.com" })).rejects.toThrow(/403.*insufficient_scope/s);
+    await expect(mcp.call("create_link", { destinationUrl: "https://example.com" })).rejects.toMatchObject({ code: 403, message: expect.stringContaining("insufficient_scope") });
     await mcp.close();
   });
 
@@ -371,20 +425,24 @@ test.describe("M8: toolsets and scopes", () => {
     expect(await mcp.toolNames()).toEqual([...CORE, ...ANALYTICS, ...LINKS].sort());
     await mcp.close();
 
+    // The confirmation toggle applies on the next request.
     await gotoReady(page, "/settings/connections");
     const row = page.getByTestId("grant-Test Client");
+    const confirm = row.getByRole("switch", { name: "Require confirmation for Test Client" });
+    await confirm.click();
+    await expect(page.getByText("Saved")).toBeVisible();
+    mcp = await connectMcp(tokens.access_token);
+    expect((await mcp.call("whoami")).structuredContent).toMatchObject({ confirmDestructive: false });
+    await mcp.close();
+
+    // So do scopes. Without write access there's nothing to confirm, so the switch turns off.
     await row.getByLabel("View your links", { exact: true }).uncheck();
     await expect(page.getByText("Permissions updated")).toBeVisible();
+    await expect(confirm).toBeDisabled();
 
     // Same token, next request: the Links tools are still listed, but calling one asks for the scope back.
     mcp = await connectMcp(tokens.access_token);
-    await expect(mcp.call("list_links")).rejects.toThrow(/403.*insufficient_scope/s);
-    await mcp.close();
-
-    // The confirmation toggle applies immediately too.
-    await row.getByRole("switch", { name: "Require confirmation for Test Client" }).click();
-    await expect(page.getByText("Saved")).toBeVisible();
-    mcp = await connectMcp(tokens.access_token);
+    await expect(mcp.call("list_links")).rejects.toMatchObject({ code: 403, message: expect.stringContaining("insufficient_scope") });
     expect((await mcp.call("whoami")).structuredContent).toMatchObject({ confirmDestructive: false, scopes: ["analytics:read"] });
     await mcp.close();
   });
