@@ -1,6 +1,6 @@
 # Where the screenshots could go in the Notion draft
 
-Notes on placing the new screenshots in the [Notion version of the draft](https://app.notion.com/p/wasp-lang/How-to-make-your-app-usable-by-AI-agents-MCPs-APIS-CLIs-3f918a74854c800c9c51e0abf8bf5e4d). All of them are in `docs/blog/assets/`. They were taken on 2026-10-14 from the deployed app (linkly-mcp-client.fly.dev), logged in as `vinny`, at 1440px wide and 2x scale.
+Notes on placing the new screenshots in the [Notion version of the draft](https://app.notion.com/p/wasp-lang/How-to-make-your-app-usable-by-AI-agents-MCPs-APIS-CLIs-3f918a74854c800c9c51e0abf8bf5e4d). All of them are in `docs/blog/assets/`. They were taken on 2026-10-14 from the deployed app ([linkly.wasp.run](https://linkly.wasp.run/)), logged in as `vinny`, at 1440px wide and 2x scale.
 
 Heads-up: most of these were taken before the latest redeploy, while Fly was still on the Oct 1 build. The landing page has since been retaken with the "For AI agents" card, and so has `screenshot-connections.png`, which now shows the "Connect an AI agent" card above the connected apps table.
 
