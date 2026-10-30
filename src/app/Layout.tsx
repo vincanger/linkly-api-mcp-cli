@@ -60,9 +60,18 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      {/* Extra bottom padding so the badge never covers the end of a page. */}
+      <main className="mx-auto max-w-6xl px-4 pt-8 pb-20">
         <Outlet />
       </main>
+      <a
+        href="https://wasp.sh"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed right-4 bottom-4 z-40 rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+      >
+        Made with <span className="font-semibold text-foreground">Wasp.sh</span> <span className="font-mono font-semibold text-yellow-500">=&#125;</span>
+      </a>
       <Toaster />
     </div>
   );
