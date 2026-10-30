@@ -16,7 +16,3 @@ playwright-report/
 cli/dist/
 
 .DS_Store
-.claude/skills/
-
-# Lock files
-package-lock.json
