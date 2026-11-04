@@ -19,7 +19,7 @@ Linkly follows that structure. The dashboard, the REST API, and the MCP server a
 
 Each part of the post's guide maps to a spot in the repo:
 
-- **Operations:** `src/<feature>/service.ts` (links, analytics, account, docs), with the dashboard's Wasp operations, `rest.ts`, and `mcp.ts` next to each one.
+- **Operations:** `src/<feature>/service.ts` (links, analytics, account, docs), with the dashboard's  operations, `rest.ts`, and `mcp.ts` next to each one.
 - **The MCP server:** [`src/mcp/`](src/mcp/) for the server and tool registry, and each feature's `mcp.ts` for its tools.
 - **The REST API:** each feature's `rest.ts`, plus the OpenAPI document generated from the same schemas in [`src/openapi/`](src/openapi/).
 - **OAuth:** [`src/oauth/`](src/oauth/). One OAuth server sits in front of both MCP and REST, clients identify themselves with CIMD (no registration), and the consent screen lets people choose each permission. Personal access tokens are there for scripts and the CLI.
@@ -32,7 +32,7 @@ There's also an animation, [Linkly's Four Ways In](https://claude.ai/artifact/QA
 
 ## Run it
 
-Requirements: Node 24+, [Wasp](https://wasp.sh) 0.25, Docker (for the dev database).
+Requirements: Node 24+, [Wasp](https://wasp.sh) 0.26, Docker (for the dev database).
 
 ```bash
 npm install
